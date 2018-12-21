@@ -77,7 +77,7 @@ class LSPI:
                                                                 self.basis_function)
 
             # difference between current policy and target policy
-            error = np.linalg.norm((new_weights - self.policy.weights))
+            error = np.linalg.norm((new_weights - self.policy.weights), 2)
             
             self.policy.theta_behavior = self.policy.weights
             self.policy.weights = new_weights
@@ -91,7 +91,7 @@ class LSTDQ:
         self.basis_function = basis_function
         self.gamma = gamma
         self.policy = init_policy
-        self.greedy = []
+        #self.greedy = []
 
     def train_parameter(self, sample, policy, basis_function):
         """ Compute Q value function of current policy
@@ -109,7 +109,8 @@ class LSTDQ:
         rewards     = sample[2]
         next_states = sample[3]
 
-        for i in range(len(states)):
+        BATCH_SIZE = len(states)
+        for i in range(BATCH_SIZE):
             # take action from the greedy target policy
             index = policy.get_actions(next_states[i]) # TODO: validation in case more actions
             # index has base actions

@@ -1,6 +1,8 @@
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("TkAgg")
 import ipdb
 
 from replay_memory import Memory
@@ -8,7 +10,7 @@ from lspi import LSPI, LSTDQ
 import plot as pl
 
 TRANSITION = 15000
-EPISODE = 1
+EPISODE = 1000
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 
@@ -47,16 +49,13 @@ def _reuse_sample2(env, memory, agent):
     important_sampling = False
 
     for j in range(EPISODE):
-
-        print ("episode %d/%d" % (j, EPISODE))
+        print ("episode %d / %d" % (j, EPISODE))
         state = env.reset()
         total_reward = 0.0
 
         for i in range(TRANSITION):
-            env.render()
-
-            # less than 50, do random action and keep samples in memory
-            if j < 50:
+            #env.render()
+            if j < 50: # less than 50, do random action and keep samples in memory
                 action = env.action_space.sample()
             else:
                 action = agent._act(state)
@@ -71,48 +70,43 @@ def _reuse_sample2(env, memory, agent):
                 print ("done")
                 break
 
-            if i % 100 == 0:
-                print("[run.py] transition i %d/%d" % (i, TRANSITION))
+            #if i % 100 == 0:
+            #    print("[run.py] transition i %d/%d" % (i, TRANSITION))
         #end for i in range(TRANSITION):
         
         sample = memory.select_sample(BATCH_SIZE) # [current_state, actions, rewards, next_state, done]
         agent.train(sample, lspi_iteration, important_sampling)
+        total_reward, policy_test = test_policy(env, state, agent)
+        print("total_reward : {}".format(total_reward))
         print("memory(deque).container_size : ", memory.container_size)
     #end for j in range(EPISODE):
 
     return mean_reward2
 
 
-def test_policy(policy, env, state, agent):
+def test_policy(env, state, agent):
 
     print ("Test")
     total_reward = 0.0
+    Best_policy=0
     state = env.reset()
 
-    for j in range(1):
-        state = env.reset()
-        for i in range(5000):
-            env.render()
+    for i in range(5000):
+        env.render()
+        action=agent._act(state)
+        next_state, reward, done, info = env.step(action)
+        state = next_state
 
-            index = policy.get_actions(state)  
-            #action = policy.actions[index[0]]  
-            action=agent._act(state)
-
-            next_state, reward, done, info = env.step(action)
-            state = next_state
-
-            total_reward += gamma * reward
-            Best_policy=0
-            if done:
-                Best_policy=agent.policy
-                print("done")
-                break
+        total_reward += gamma * reward
+        if done:
+            Best_policy=agent.policy
+            print("done")
+            break
 
     return total_reward, Best_policy
 
 
 def _initial_sample2(env, memory, agent):
-    
     state = env.reset()
     total_reward = -4000
     best_reward = -4000
@@ -125,11 +119,11 @@ def _initial_sample2(env, memory, agent):
         best_theta = False
 
         for i in range(TRANSITION):
-            # env.render()
+            env.render()
             # action = agent._act(state)
             if best_reward >= total_reward and found == False:
                 action = env.action_space.sample()
-            else:
+            else: # impossible
                 agent=Best_agent
                 best_theta = True
                 action = agent._act(state)
@@ -143,13 +137,13 @@ def _initial_sample2(env, memory, agent):
                 break
 
         if j > 0:
-            if done:
+            if done: # enough, so small train
                 sample = memory.select_sample(j)
-            else:
+            else: # If done is False, it means lack of training?
                 sample = memory.select_sample(TRANSITION)
             
-            policy = agent.train(sample, lspi_iteration, important_sampling)
-            total_reward, policy_test = test_policy(policy, env, state, agent)
+            agent.train(sample, lspi_iteration, important_sampling)
+            total_reward, policy_test = test_policy(env, state, agent)
 
             if best_reward < total_reward:
                 Best_agent = agent
@@ -160,7 +154,9 @@ def _initial_sample2(env, memory, agent):
             print("total_reward", total_reward)
             if best_theta:
                 memory.clear_memory()
-
+       
+        #
+        mean_reward1.append(total_reward)
     #for j in range(EPISODE)
     memory.clear_memory()
     return mean_reward1
@@ -168,21 +164,21 @@ def _initial_sample2(env, memory, agent):
 def main():
 
     agent, env, memory = experiment_1()
-    print ("memory size", memory.container_size)
+    #print ("memory size", memory.container_size)
 
     y2 = _reuse_sample2(env, memory, agent)
     print("_reuse_sample2 done!")
-    y1 = _initial_sample2(env, memory, agent)
-    print("_initial_sample2 done!")
+    #y1 = _initial_sample2(env, memory, agent)
+    #print("_initial_sample2 done!")
 
-    x = np.arange(0, len(mean_reward1))
+    #x = np.arange(0, len(mean_reward1))
 
-    np.reshape(mean_reward1, x.shape)
-    print (x.shape, mean_reward1, mean_reward2, x)
+    #np.reshape(mean_reward1, x.shape)
+    #print (x.shape, mean_reward1, mean_reward2, x)
 
-    ipdb.set_trace()
-    pj = pl.Plot()
-    pj.plot_rewad(x, y1, y2)
+    #ipdb.set_trace()
+    #pj = pl.Plot()
+    #pj.plot_rewad(x, y1, y2)
 
 if __name__ == '__main__':
     main()

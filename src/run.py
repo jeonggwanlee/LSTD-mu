@@ -49,7 +49,6 @@ def _reuse_sample2(env, memory, agent):
     important_sampling = False
 
     for j in range(EPISODE):
-        print ("episode %d / %d" % (j, EPISODE))
         state = env.reset()
         total_reward = 0.0
 
@@ -58,6 +57,9 @@ def _reuse_sample2(env, memory, agent):
             if j < 50: # less than 50, do random action and keep samples in memory
                 action = env.action_space.sample()
             else:
+                if j == 50:
+                    if i % 10 == 0:
+                        print (i)
                 action = agent._act(state)
                 sample = memory.select_sample(BATCH_SIZE) # [current_state, actions, rewards, next_state, done]
                 agent.train(sample, lspi_iteration, important_sampling)
@@ -67,7 +69,7 @@ def _reuse_sample2(env, memory, agent):
 
             state = next_state
             if done:
-                print ("done")
+                print ("epi done")
                 break
 
             #if i % 100 == 0:
@@ -77,8 +79,8 @@ def _reuse_sample2(env, memory, agent):
         sample = memory.select_sample(BATCH_SIZE) # [current_state, actions, rewards, next_state, done]
         agent.train(sample, lspi_iteration, important_sampling)
         total_reward, policy_test = test_policy(env, state, agent)
-        print("total_reward : {}".format(total_reward))
-        print("memory(deque).container_size : ", memory.container_size)
+        print("[episode {}/{}] total_reward : {}".format(j, EPISODE, total_reward))
+        #print("memory(deque).container_size : ", memory.container_size)
     #end for j in range(EPISODE):
 
     return mean_reward2
@@ -86,7 +88,6 @@ def _reuse_sample2(env, memory, agent):
 
 def test_policy(env, state, agent):
 
-    print ("Test")
     total_reward = 0.0
     Best_policy=0
     state = env.reset()
@@ -100,7 +101,6 @@ def test_policy(env, state, agent):
         total_reward += gamma * reward
         if done:
             Best_policy=agent.policy
-            print("done")
             break
 
     return total_reward, Best_policy

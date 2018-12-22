@@ -1,6 +1,7 @@
 import numpy as np
 from rbf import Basis_Function
 from policy import Policy
+import ipdb
 
 """
 important property of LSPI is that it does not require an an approximate
@@ -25,20 +26,24 @@ class LSPI:
         epsilon : stopping criterion
         policy(pi) : initial policy
     """
-    def __init__(self, num_actions=3, num_means=2, gamma=0.99):
+    #def __init__(self, num_actions=3, num_means=2, gamma=0.99):
+    def __init__(self, num_actions=3, state_dim=2, gamma=0.99):
         """
         num_actions. Number of actions. Int.
-        num_means. Number of means. Int.
+        state_dim. Number of means. Int. (= state_dim)
         gamma. Float.
         """
         
         print ("LSPI init!")
-        print ("num_actions : %d, num_means(dim_of_states) : %d" %
-                (num_actions, num_means))
+        print ("num_actions : %d, state_dim(dim_of_states) : %d" %
+                (num_actions, state_dim))
 
-        self.basis_function = Basis_Function(num_means, num_means, num_actions, gamma)
+        num_features = state_dim + 1 # for convenience 
+        self.basis_function = Basis_Function(state_dim, num_features, num_actions, gamma)
+
         num_basis = self.basis_function._num_basis()
-        self.policy = Policy(self.basis_function, num_basis)
+        actions = list(range(num_actions))
+        self.policy = Policy(self.basis_function, num_basis, actions)
         self.lstdq = LSTDQ(self.basis_function, gamma, self.policy)
         self.stop_criterion = 10**-5
         self.gamma = gamma
@@ -57,23 +62,16 @@ class LSPI:
         while (epsilon * (1 - self.gamma) / self.gamma) < error and num_iteration < total_iteration:
 
             if w_important_Sampling:
-                new_weights = self.lstdq.train_parameter(sample,
-                                                         self.policy,
-                                                         self.basis_function)
+                new_weights = self.lstdq.train_parameter(sample, self.policy)
                 #new_weights = self.lstdq.train_weight_parameter(sample,
                 #                                                self.policy,
                 #                                                self.basis_function)
 
             else:
-                new_weights = self.lstdq.train_parameter(sample,
-                                                                self.policy,
-                                                                self.basis_function)
+                new_weights = self.lstdq.train_parameter(sample, self.policy)
 
             error = np.linalg.norm((new_weights - self.policy.weights), 2)
-            
             self.policy.update_weights(new_weights)
-            #self.policy.theta_behavior = self.policy.weights
-            #self.policy.weights = new_weights
             num_iteration += 1
 
         return self.policy
@@ -86,12 +84,14 @@ class LSTDQ:
         self.policy = init_policy
         #self.greedy = []
 
-    def train_parameter(self, sample, policy, basis_function):
+    def train_parameter(self, sample, policy):
         """ Compute Q value function of current policy
             to obtain the greedy policy
             -> theta
         """
-        k = basis_function._num_basis()
+    
+        self.policy = policy
+        k = self.basis_function._num_basis()
 
         A = np.zeros([k, k])
         b = np.zeros([k, 1])
@@ -105,13 +105,11 @@ class LSTDQ:
         BATCH_SIZE = len(states)
         for i in range(BATCH_SIZE):
             # take action from the greedy target policy
-            index = policy.get_actions(next_states[i]) # TODO: validation in case more actions
-            # index has base actions
-            action = policy.actions[index[0]]
-            
+            action = self.policy.get_best_action(next_states[i])
+
             phi =      self.basis_function.evaluate(states[i], actions[i])
             phi_next = self.basis_function.evaluate(next_states[i], action)
-
+            
             loss = (phi - self.gamma * phi_next)
             phi  = np.resize(phi, [k, 1])
             loss = np.resize(phi, [1, len(loss)])

@@ -1,25 +1,22 @@
 import numpy as np
+import ipdb
 
 class Basis_Function:
     """
     Basis function.
     """
-    def __init__(self, input_dim, num_means, num_actions, gamma):
+    def __init__(self, input_dim, num_features, num_actions, gamma):
         self.input_dim = input_dim
-        self.num_means = num_means
+        self.num_features = num_features
         self.gamma = gamma # 5?
         self.num_actions = num_actions
+        self.num_feature_means = self.num_features - 1
 
-        # np.random.uniform(low, high, size)
-        self.means = [np.random.uniform(-1, 1, input_dim) for i in range(self.num_means)]
-
-        self.beta = 8 # ?
+        self.feature_means = [np.random.uniform(-1, 1, input_dim) for _ in range(self.num_feature_means)] 
+        # (num_means, input_dim) # (state_dim, state_dim)
 
     def _num_basis(self):
-        """
-        => (#states * #actions)
-        """
-        return (len(self.means)+1) * self.num_actions
+        return self.num_features * self.num_actions
 
 
     def __calc_basis_component(self, state, mean, gamma):
@@ -35,23 +32,19 @@ class Basis_Function:
         state. 
         action.
         """
-        if type(action) != int:
-            action = action[0]
-
-        if state.shape != self.means[0].shape:
+        if type(action) != int and type(action) != np.int64:
+            raise ValueError("action should be int type!")
+        if state.shape != self.feature_means[0].shape:
             print("state.shape : %d, self.means[0].shape : %d" % 
-                    (state.shape, self.means[0].shape))
+                    (state.shape, self.feature_means[0].shape))
             raise ValueError('Dimensions of state no match dimensions of means')
 
-        phi = np.zeros((self._num_basis(),))
-        offset = (len(self.means[0])+1) * action
+        k = self._num_basis()
+        phi = np.zeros((k,))
+        offset = self.num_features * action
 
-        rbf = [self.__calc_basis_component(state, mean, self.gamma)
-                for mean in self.means]
-        try:
-            phi[offset] = 1.
-        except:
-            import ipdb; ipdb.set_trace()
+        rbf = [self.__calc_basis_component(state, mean, self.gamma) for mean in self.feature_means]
+        phi[offset] = 1.
         phi[offset + 1: offset + 1 + len(rbf)] = rbf
 
         return phi

@@ -1,14 +1,15 @@
 import numpy as np
 from rbf import Basis_Function
+import ipdb
 
 class Policy:
-    def __init__(self, basis, num_theta, theta=None):
+    def __init__(self, basis, num_theta, actions, theta=None):
         """
         self.basis_function
         self.weights
         """
         self.basis_function = basis
-        self.actions = [0, 1, 2]
+        self.actions = actions
         self.num_theta = num_theta
         self.theta_behavior = theta
 
@@ -34,7 +35,7 @@ class Policy:
         state
         -> best_actions
         """
-        q_state_action = [self.q_value_function(state, self.actions[i]) for i in range(len(self.actions))]
+        q_state_action = [self.q_value_function(state, a) for a in self.actions]
         q_state_action = np.reshape(q_state_action, [len(q_state_action), 1]) # convert to column vector
 
         index = np.argmax(q_state_action)
@@ -48,3 +49,7 @@ class Policy:
                 ind.append(i)
 
         return best_actions
+
+    def get_best_action(self, state):
+        indices = self.get_actions(state)
+        return self.actions[indices[0]]

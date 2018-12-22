@@ -1,8 +1,9 @@
 import gym
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use("TkAgg")
+import time
+#import matplotlib.pyplot as plt
+#import matplotlib
+#matplotlib.use("TkAgg")
 import ipdb
 
 from replay_memory import Memory
@@ -29,13 +30,13 @@ def experiment_1():
     state = env.reset()
 
     num_actions = env.action_space.n
-    obs_dim = env.observation_space.shape[0]
-    print("num_actions : %d, obs_dim : %d" % (num_actions, obs_dim))
-    
+    state_dim = env.observation_space.shape[0]
     action_dim = 1
-    memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, obs_dim)
+    print("state_dim : %d\naction_dim : %d\nnum_actions : %d\n" % (state_dim, action_dim, num_actions))
 
-    agent = LSPI(num_actions, obs_dim)
+    memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
+
+    agent = LSPI(num_actions, state_dim)
     return agent, env, memory, 'Acrobot-v1'
 
 def experiment_2():
@@ -43,14 +44,14 @@ def experiment_2():
     env = gym.make('CartPole-v0')
     state = env.reset()
 
-    num_actions = env.action_space.n + 1
-    obs_dim = env.observation_space.shape[0]
-    print("num_actions : %d, obs_dim : %d" % (num_actions, obs_dim))
-
+    num_actions = env.action_space.n
+    state_dim = env.observation_space.shape[0]
     action_dim = 1
-    memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, obs_dim)
+    print("state_dim : %d\naction_dim : %d\nnum_actions : %d\n" % (state_dim, action_dim, num_actions))
 
-    agent = LSPI(num_actions, obs_dim)
+    memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
+
+    agent = LSPI(num_actions, state_dim)
     return agent, env, memory, 'CartPole-v0'
 
 def experiment_3():
@@ -85,6 +86,9 @@ def _reuse_sample2(env, memory, agent, name):
         state = env.reset()
         total_reward = 0.0
 
+        if j >= 50:
+            pass
+            #start = time.time()
         for i in range(TRANSITION):
             #env.render()
             if j < 50:
@@ -100,26 +104,33 @@ def _reuse_sample2(env, memory, agent, name):
                 print ("Get the goal(done)")
                 break
         #end for i in range(TRANSITION):
-        if i < BATCH_SIZE:
-            sample = memory.select_sample(i)
+        if j >= 50:
+            pass
+            #end = time.time()
+            #print(end-start)
+        if memory.container_size < BATCH_SIZE:
+            sample = memory.select_sample(memory.container_size)
         else:
             sample = memory.select_sample(BATCH_SIZE)
 
+        #start = time.time()
         agent.train(sample, lspi_iteration, important_sampling)
+        #end = time.time()
+        #print("j : ",j, "time : ", end-start)
         total_reward, policy_test = test_policy(env, state, agent)
         mean_reward2.append(total_reward)
 
-        with open("{}.csv".format(name), 'a') as f:
-            f.write("{},{}\n".format(j, total_reward))
+        with open("1221_reuse_{}.csv".format(name), 'a') as f:
+            f.write("{}\n".format(total_reward))
         print("[episode {}/{}] total_reward : {}".format(j, EPISODE, total_reward))
         #print("memory(deque).container_size : ", memory.container_size)
     #end for j in range(EPISODE):
 
-    ipdb.set_trace()
     while 1:
         total_reward, policy_test = test_policy(env, state, agent, render=True)
         print (total_reward) 
-
+        with open("1221_reuse_{}.csv".format(name), 'a') as f:
+            f.write("{}\n".format(total_reward))
 
     return mean_reward2
 
@@ -137,7 +148,7 @@ def test_policy(env, state, agent, render=False):
         next_state, reward, done, info = env.step(action)
         state = next_state
 
-        total_reward += gamma * reward
+        total_reward += reward
         if done:
             Best_policy=agent.policy
             break
@@ -153,7 +164,6 @@ def _initial_sample2(env, memory, agent, name):
     best_theta = False
     found = False
 
-
     for j in range(EPISODE):
         state = env.reset()
         best_theta = False
@@ -167,14 +177,13 @@ def _initial_sample2(env, memory, agent, name):
                 agent=Best_agent    
                 best_theta = True   
                 action = agent._act(state)
-            next_state, reward, done, info = env.step(action)      
+            next_state, reward, done, info = env.step(action)
             memory.add([state, action, reward, next_state, done])
             state = next_state
             if done:
                 print("done iteration = %d" % (i))
                 break
         #end for i in range(TRANSITION)
-
         if done: # enough, so small train
             sample = memory.select_sample(i)
         else: # If done is False, it means lack of training?
@@ -191,8 +200,8 @@ def _initial_sample2(env, memory, agent, name):
         else:
             found = False
 
-        with open("_initial_sample2_{}.csv".format(name), 'a') as f:
-            f.write("{},{}\n".format(j, total_reward))
+        with open("1222initial_sample2_{}.csv".format(name), 'a') as f:
+            f.write("{}\n".format(total_reward))
         print("_initial_sample2 [episode {}/{}] total_reward : {}".format(j, EPISODE, total_reward))
 
         if best_theta:
@@ -202,9 +211,16 @@ def _initial_sample2(env, memory, agent, name):
     memory.clear_memory()
     
     ipdb.set_trace()
+
+    #with open('best_agent.pickle')
+    #pickle.dump()
+
     while 1:
         total_reward, policy_test = test_policy(env, state, agent)
-        print (total_reward) 
+        print (total_reward)
+        with open("1222initial_sample2_{}.csv".format(name), 'a') as f:
+            f.write("{}\n".format(total_reward))
+
 
     return mean_reward1
 

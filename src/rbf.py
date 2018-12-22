@@ -48,8 +48,10 @@ class Basis_Function:
 
         rbf = [self.__calc_basis_component(state, mean, self.gamma)
                 for mean in self.means]
-
-        phi[offset] = 1.
+        try:
+            phi[offset] = 1.
+        except:
+            import ipdb; ipdb.set_trace()
         phi[offset + 1: offset + 1 + len(rbf)] = rbf
 
         return phi

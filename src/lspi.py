@@ -36,17 +36,10 @@ class LSPI:
         print ("num_actions : %d, num_means(dim_of_states) : %d" %
                 (num_actions, num_means))
 
-        # 6, 6, 1, gamma
-        """
-        basis_function
-
-        """
         self.basis_function = Basis_Function(num_means, num_means, num_actions, gamma)
         num_basis = self.basis_function._num_basis()
-
         self.policy = Policy(self.basis_function, num_basis)
         self.lstdq = LSTDQ(self.basis_function, gamma, self.policy)
-
         self.stop_criterion = 10**-5
         self.gamma = gamma
 
@@ -76,11 +69,11 @@ class LSPI:
                                                                 self.policy,
                                                                 self.basis_function)
 
-            # difference between current policy and target policy
             error = np.linalg.norm((new_weights - self.policy.weights), 2)
             
-            self.policy.theta_behavior = self.policy.weights
-            self.policy.weights = new_weights
+            self.policy.update_weights(new_weights)
+            #self.policy.theta_behavior = self.policy.weights
+            #self.policy.weights = new_weights
             num_iteration += 1
 
         return self.policy

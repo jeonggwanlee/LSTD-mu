@@ -24,6 +24,10 @@ class Policy:
         vector_basis = self.basis_function.evaluate(state, action) # basis functions pi(s, a)
         return np.dot(vector_basis, self.weights)  # pi(s, a) * weights
 
+    def update_weights(self, new_weights):
+        self.theta_behavior = self.weights
+        self.weights = new_weights
+
     # LSPI._act
     def get_actions(self, state):
         """

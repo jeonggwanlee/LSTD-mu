@@ -57,6 +57,7 @@ class Memory:
         """ Pick samples from container
         """
         #print ("container_size : ", self.container_size)
+        #print ("batch :", batch_size)
         sample = random.sample(self.container, batch_size)
         return self.transform_sample(sample, batch_size)
 

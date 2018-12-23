@@ -49,6 +49,8 @@ class LSPI:
         self.gamma = gamma
 
     def _act(self, state):
+        """ phi(s) = argmax_a Q(s, a) and pick first action
+        """
         index = self.policy.get_actions(state)
         action = self.policy.actions[index[0]]
         return action

@@ -1,0 +1,201 @@
+Record time : 2018-12-23_19-56-12
+mean : 119.69
+Record time : 2018-12-23_19-56-16
+mean : 39.02
+Record time : 2018-12-23_19-56-20
+mean : 9.28
+Record time : 2018-12-23_19-56-23
+mean : 9.28
+Record time : 2018-12-23_19-56-28
+mean : 33.41
+Record time : 2018-12-23_19-56-33
+mean : 9.38
+Record time : 2018-12-23_19-56-37
+mean : 9.35
+Record time : 2018-12-23_19-56-41
+mean : 13.69
+Record time : 2018-12-23_19-56-47
+mean : 13.2
+Record time : 2018-12-23_19-56-52
+mean : 55.12
+Record time : 2018-12-23_19-56-57
+mean : 9.48
+Record time : 2018-12-23_19-57-02
+mean : 13.29
+Record time : 2018-12-23_19-57-06
+mean : 9.33
+Record time : 2018-12-23_19-57-10
+mean : 9.4
+Record time : 2018-12-23_19-57-14
+mean : 35.95
+Record time : 2018-12-23_19-57-19
+mean : 39.07
+Record time : 2018-12-23_19-57-23
+mean : 9.3
+Record time : 2018-12-23_19-57-26
+mean : 9.26
+Record time : 2018-12-23_19-57-29
+mean : 9.33
+Record time : 2018-12-23_19-57-33
+mean : 9.41
+Record time : 2018-12-23_19-57-37
+mean : 9.41
+Record time : 2018-12-23_19-57-42
+mean : 10.54
+Record time : 2018-12-23_19-57-45
+mean : 28.93
+Record time : 2018-12-23_19-57-51
+mean : 9.44
+Record time : 2018-12-23_19-57-55
+mean : 20.83
+Record time : 2018-12-23_19-57-59
+mean : 9.4
+Record time : 2018-12-23_19-58-03
+mean : 25.81
+Record time : 2018-12-23_19-58-07
+mean : 9.9
+Record time : 2018-12-23_19-58-15
+mean : 10.06
+Record time : 2018-12-23_19-58-20
+mean : 35.68
+Record time : 2018-12-23_19-58-26
+mean : 9.44
+Record time : 2018-12-23_19-58-30
+mean : 9.34
+Record time : 2018-12-23_19-58-35
+mean : 9.35
+Record time : 2018-12-23_19-58-42
+mean : 11.23
+Record time : 2018-12-23_19-58-49
+mean : 9.33
+Record time : 2018-12-23_19-58-54
+mean : 57.91
+Record time : 2018-12-23_19-58-59
+mean : 9.3
+Record time : 2018-12-23_19-59-03
+mean : 9.3
+Record time : 2018-12-23_19-59-09
+mean : 37.84
+Record time : 2018-12-23_19-59-14
+mean : 13.31
+Record time : 2018-12-23_19-59-18
+mean : 9.26
+Record time : 2018-12-23_19-59-23
+mean : 9.34
+Record time : 2018-12-23_19-59-29
+mean : 9.68
+Record time : 2018-12-23_19-59-34
+mean : 9.3
+Record time : 2018-12-23_19-59-39
+mean : 21.85
+Record time : 2018-12-23_19-59-45
+mean : 24.55
+Record time : 2018-12-23_19-59-50
+mean : 39.44
+Record time : 2018-12-23_19-59-56
+mean : 9.33
+Record time : 2018-12-23_20-00-01
+mean : 49.45
+Record time : 2018-12-23_20-00-06
+mean : 9.38
+Record time : 2018-12-23_20-00-13
+mean : 9.36
+Record time : 2018-12-23_20-00-17
+mean : 9.4
+Record time : 2018-12-23_20-00-23
+mean : 9.28
+Record time : 2018-12-23_20-00-28
+mean : 38.67
+Record time : 2018-12-23_20-00-34
+mean : 19.03
+Record time : 2018-12-23_20-00-40
+mean : 25.52
+Record time : 2018-12-23_20-00-46
+mean : 9.38
+Record time : 2018-12-23_20-00-50
+mean : 67.59
+Record time : 2018-12-23_20-00-56
+mean : 13.95
+Record time : 2018-12-23_20-01-00
+mean : 23.75
+Record time : 2018-12-23_20-01-05
+mean : 9.47
+Record time : 2018-12-23_20-01-10
+mean : 12.11
+Record time : 2018-12-23_20-01-15
+mean : 59.78
+Record time : 2018-12-23_20-01-20
+mean : 9.47
+Record time : 2018-12-23_20-01-24
+mean : 9.16
+Record time : 2018-12-23_20-01-30
+mean : 9.41
+Record time : 2018-12-23_20-01-36
+mean : 9.5
+Record time : 2018-12-23_20-01-42
+mean : 22.91
+Record time : 2018-12-23_20-01-47
+mean : 9.43
+Record time : 2018-12-23_20-01-52
+mean : 9.47
+Record time : 2018-12-23_20-01-58
+mean : 41.59
+Record time : 2018-12-23_20-02-02
+mean : 9.37
+Record time : 2018-12-23_20-02-08
+mean : 9.2
+Record time : 2018-12-23_20-02-13
+mean : 56.58
+Record time : 2018-12-23_20-02-18
+mean : 9.41
+Record time : 2018-12-23_20-02-22
+mean : 11.39
+Record time : 2018-12-23_20-02-27
+mean : 24.9
+Record time : 2018-12-23_20-02-32
+mean : 9.5
+Record time : 2018-12-23_20-02-35
+mean : 9.36
+Record time : 2018-12-23_20-02-41
+mean : 15.34
+Record time : 2018-12-23_20-02-46
+mean : 9.98
+Record time : 2018-12-23_20-02-50
+mean : 9.32
+Record time : 2018-12-23_20-02-54
+mean : 9.4
+Record time : 2018-12-23_20-02-57
+mean : 11.26
+Record time : 2018-12-23_20-03-02
+mean : 18.6
+Record time : 2018-12-23_20-03-08
+mean : 9.39
+Record time : 2018-12-23_20-03-13
+mean : 9.4
+Record time : 2018-12-23_20-03-18
+mean : 12.91
+Record time : 2018-12-23_20-03-22
+mean : 9.34
+Record time : 2018-12-23_20-03-27
+mean : 18.92
+Record time : 2018-12-23_20-03-34
+mean : 9.24
+Record time : 2018-12-23_20-03-39
+mean : 9.43
+Record time : 2018-12-23_20-03-42
+mean : 20.83
+Record time : 2018-12-23_20-03-47
+mean : 25.73
+Record time : 2018-12-23_20-03-51
+mean : 45.87
+Record time : 2018-12-23_20-03-55
+mean : 9.47
+Record time : 2018-12-23_20-04-00
+mean : 27.83
+Record time : 2018-12-23_20-04-05
+mean : 16.33
+Record time : 2018-12-23_20-04-09
+mean : 9.99
+Record time : 2018-12-23_20-04-14
+mean : 15.95
+meanmean 18.956400000000002

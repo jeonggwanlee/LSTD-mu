@@ -31,8 +31,8 @@ class Policy:
 
     # LSPI._act
     def get_actions(self, state):
-        """
-        state
+        """ pi(s) = argmax_a Q(s, a)
+        state.
         -> best_actions
         """
         q_state_action = [self.q_value_function(state, a) for a in self.actions]
@@ -43,6 +43,7 @@ class Policy:
         best_actions = [self.actions[index]]
         ind = [index]
 
+        # Find other actions which has same value of q_max
         for i in range(len(q_state_action)):
             if q_state_action[i] == q_max and index != i:
                 best_actions.append(self.actions[i])

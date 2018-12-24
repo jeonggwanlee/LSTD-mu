@@ -1,9 +1,9 @@
 import ipdb
 import numpy as np
-EPISODE = 20
+EPISODE = 100
 NUM_TESTS = 100
 TRAINOPT = ['random', 'initial']
-trainopt = 'initial'
+trainopt = 'random'
 assert trainopt in TRAINOPT
 game_name = 'CartPole-v0'
 
@@ -38,16 +38,14 @@ with open(csv_name, 'r') as rf:
     rewards = np.asarray(rewards)
     rewardsT = rewards
 
-new_csv_name = get_test_record_title(game_name, EPISODE, trainopt, num_tests=NUM_TESTS) + '_plot2.csv'
+new_csv_name = get_test_record_title(game_name, EPISODE, trainopt, num_tests=NUM_TESTS) + '_plot.csv'
 
 
 with open(new_csv_name, 'w') as wf:
     
     for i in range(rewardsT.shape[0]):
         for j in range(rewardsT.shape[1]):
-            if j == 0 or j == rewardsT.shape[1]-1:
-                wf.write("{}".format(rewardsT[i][j]))
-            #if j != rewardsT.shape[1]-1:
-            if j == 0:
+            wf.write("{}".format(rewardsT[i][j]))
+            if j != rewardsT.shape[1]-1:
                 wf.write(",")
         wf.write('\n')

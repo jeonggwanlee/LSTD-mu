@@ -64,6 +64,7 @@ class Memory:
         """
         #print ("container_size : ", self.container_size)
         #print ("batch :", batch_size)
+        random.seed()
         sample = random.sample(self.container, batch_size)
         return self.__transform_sample(sample, batch_size)
 

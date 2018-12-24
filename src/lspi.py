@@ -72,7 +72,7 @@ class LSPI:
             else:
                 new_weights = self.lstdq.train_parameter(sample, self.policy)
 
-            error = np.linalg.norm((new_weights - self.policy.weights), 2)
+            error = np.linalg.norm((new_weights - self.policy.weights))
             self.policy.update_weights(new_weights)
             num_iteration += 1
 

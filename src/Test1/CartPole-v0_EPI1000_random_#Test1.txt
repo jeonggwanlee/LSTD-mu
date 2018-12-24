@@ -1,0 +1,3 @@
+Record time : 2018-12-23_22-21-04
+testing mean : 21.1
+meanmean 21.1

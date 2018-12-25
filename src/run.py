@@ -3,11 +3,12 @@ import numpy as np
 import datetime
 import ipdb
 import os
+import pickle
+import copy
 
 from replay_memory import Memory
 from lspi import LSPI, LSTDQ
-
-#import plot as pl
+from record import get_test_record_title
 
 TRANSITION = 15000
 EPISODE = 1000
@@ -15,9 +16,9 @@ BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EXPERI = 1
 NUM_TESTS_MIDDLE = 1000
-TRAINOPT = ['random', 'initial', 'reuse']
+TRAINOPT = ['random', 'initial', 'initial2', 'reuse']
 
-important_sampling = None 
+important_sampling = True
 lspi_iteration = 20 #?
 gamma = 0.99
 
@@ -91,7 +92,7 @@ def _random_sample(env, memory, agent, game_name, isRender=False):
             sample = memory.select_sample(memory.container_size)
         else:
             sample = memory.select_sample(BATCH_SIZE)
-        agent.train(sample, lspi_iteration, important_sampling)
+        error = agent.train(sample, lspi_iteration, important_sampling)
 
         # Get middle mean
         rewards = []
@@ -104,7 +105,7 @@ def _random_sample(env, memory, agent, game_name, isRender=False):
 
         # Write csv
         with open(csv_name, 'a') as f:
-            f.write("{},{},{}\n".format(middle, best, worst))
+            f.write("{},{},{},{}\n".format(middle, best, worst, error))
 
         # Print iteration
         if i % 10 == 0:
@@ -123,84 +124,158 @@ def _random_sample(env, memory, agent, game_name, isRender=False):
     return env, agent
 
 
-def _initial_sample(env, memory, agent, game_name, isRender=False):
-    total_reward = -4000
-    Best_reward = -4000
+def _initial2_sample(env, memory, agent, game_name, isRender=False):
+    Best_agent_list = []
+    mean_reward = -4000
+    Best_mean_reward = -4000
     Best_agent = None
-    Best_theta = False
-    Found_best = False
-    mean_rewards = []
+    Best_agent_copy = None
+    csv_name = get_test_record_title(game_name, EPISODE, 'initial2', num_tests=NUM_EXPERI) + '.csv'
+    bin_name = get_test_record_title(game_name, EPISODE, 'initial2', num_tests=NUM_EXPERI) + '_pickle.bin'
 
     for i in range(EPISODE):
         # Intializaiton
+        env.seed()
         state = env.reset()
-        Best_theta = False
 
         # Collect samples 
         for j in range(TRANSITION):
             if isRender:
                 env.render()
-            if Found_best is False:
-                action = env.action_space.sample()
-            else:
-                agent = Best_agent    
-                Best_theta = True   
-                action = agent._act(state)
+            action = env.action_space.sample()
             next_state, reward, done, info = env.step(action)
             memory.add([state, action, reward, next_state, done])
             state = next_state
             if done:
-                done_iter = j
                 break
 
         # Get batch of samples and Training
-        if done: 
-            sample = memory.select_sample(done_iter)
+        if memory.container_size < BATCH_SIZE: 
+            sample = memory.select_sample(memory.container_size)
         else:
             sample = memory.select_sample(BATCH_SIZE)
-        agent.train(sample, lspi_iteration, important_sampling)
+        error = agent.train(sample, lspi_iteration, important_sampling)
 
         # Get middle mean
-        be_meaned = []
+        reward_list = []
         for j in range(NUM_TESTS_MIDDLE):
             total_reward, _ = test_policy(env, agent)
-            be_meaned.append(total_reward)
-        middle_mean_reward = sum(be_meaned) / NUM_TESTS_MIDDLE
+            reward_list.append(total_reward)
+        mean_reward = sum(reward_list) / NUM_TESTS_MIDDLE
+
+        # Write csv
+        with open(csv_name, 'a') as f:
+            f.write("{}\n".format(mean_reward))
 
         # If getting the best reward, model will collect and learn
                                         # greedy samples at next iteration
-        if Best_reward < total_reward:
+        if Best_mean_reward < mean_reward:
+
             Best_agent = agent
-            Best_reward = total_reward
-            Found_best = True
-        else:
-            Found_best = False
-
-        # After learning greedy samples, reinitialize memory
-        if Best_theta:
+            Best_mean_reward = mean_reward
             memory.clear_memory()
+            Best_agent_copy = copy.deepcopy(Best_agent)
+            Best_agent_list.append(Best_agent_copy)
+            # Write csv
+            with open(csv_name, 'a') as f:
+                print("# Get Best agent {}".format(mean_reward))
+                f.write("# Get Best agent\n")
+            
+            if os.path.exists(bin_name):
+                os.remove(bin_name)
+            with open(bin_name, 'wb') as f:
+                pickle.dump(Best_agent_list, f) 
+        #else 
+            # not role back
+        
 
-        # Append middle mean
-        mean_rewards.append(middle_mean_reward)
-        if i % 50 == 0:
+        if i % 10 == 0:
             print('[episode {}] done'.format(i))
     #for i in range(EPISODE)
    
-    # Write csv
-    csv_name = get_test_record_title(game_name, EPISODE, 'initial', num_tests=NUM_EXPERI) + '.csv'
-    with open(csv_name, 'a') as f:
-        for middle_mean_reward in mean_rewards:
-            f.write("{}\n".format(middle_mean_reward))
-        f.write('\n')
-
-    # Print mean
-    mean = sum(mean_rewards) / EPISODE
-    print("_initial_sample training mean : {}".format(mean))
-    
     # Clean up
     memory.clear_memory()
 
-    return env, agent
+    return env, Best_agent
+
+
+
+
+
+def _initial_sample(env, memory, agent, game_name, isRender=False):
+    Best_agent_list = []
+    mean_reward = -4000
+    Best_mean_reward = -4000
+    Best_agent = None
+    Best_agent_copy = None
+    csv_name = get_test_record_title(game_name, EPISODE, 'initial', num_tests=NUM_EXPERI) + '.csv'
+    bin_name = get_test_record_title(game_name, EPISODE, 'initial', num_tests=NUM_EXPERI) + '_pickle.bin'
+
+    for i in range(EPISODE):
+        # Intializaiton
+        env.seed()
+        state = env.reset()
+
+        # Collect samples 
+        for j in range(TRANSITION):
+            if isRender:
+                env.render()
+            action = env.action_space.sample()
+            next_state, reward, done, info = env.step(action)
+            memory.add([state, action, reward, next_state, done])
+            state = next_state
+            if done:
+                break
+
+        # Get batch of samples and Training
+        if memory.container_size < BATCH_SIZE: 
+            sample = memory.select_sample(memory.container_size)
+        else:
+            sample = memory.select_sample(BATCH_SIZE)
+        error = agent.train(sample, lspi_iteration, important_sampling)
+
+        # Get middle mean
+        reward_list = []
+        for j in range(NUM_TESTS_MIDDLE):
+            total_reward, _ = test_policy(env, agent)
+            reward_list.append(total_reward)
+        mean_reward = sum(reward_list) / NUM_TESTS_MIDDLE
+
+        # Write csv
+        with open(csv_name, 'a') as f:
+            f.write("{}\n".format(mean_reward))
+
+        # If getting the best reward, model will collect and learn
+                                        # greedy samples at next iteration
+        if Best_mean_reward < mean_reward:
+
+            Best_agent = agent
+            Best_mean_reward = mean_reward
+            memory.clear_memory()
+            Best_agent_copy = copy.deepcopy(Best_agent)
+            Best_agent_list.append(Best_agent_copy)
+            # Write csv
+            with open(csv_name, 'a') as f:
+                print("# Get Best agent {}".format(mean_reward))
+                f.write("# Get Best agent\n")
+            
+            if os.path.exists(bin_name):
+                os.remove(bin_name)
+            with open(bin_name, 'wb') as f:
+                pickle.dump(Best_agent_list, f)
+ 
+        else:
+            # way back
+            agent = Best_agent
+
+        if i % 10 == 0:
+            print('[episode {}] done'.format(i))
+    #for i in range(EPISODE)
+   
+    # Clean up
+    memory.clear_memory()
+
+    return env, Best_agent
 
 
 def _reuse_sample(env, memory, agent, game_name, isRender=False):
@@ -289,16 +364,13 @@ def test_policy(env, agent, isRender=False):
 
     return total_reward, best_policy
 
-def get_test_record_title(game_name, episode, trainOpt, num_tests=NUM_EXPERI):
-    title = '{}_EPI{}_{}_#Test{}'.format(game_name, episode, trainOpt, num_tests)
-    return title
 
-def _test_record(env, agent, trainOpt, episode, game_name, num_tests=NUM_EXPERI):
+def _test_record(env, agent, trainopt, episode, game_name, num_tests=NUM_EXPERI):
     """DEPRECATED
     """
 
     be_meaned = []
-    txt_name = get_test_record_title(game_name, episode, trainOpt, num_tests) + '.txt'
+    txt_name = get_test_record_title(game_name, episode, trainopt, num_tests) + '.txt'
 
     #print('...recoding({})...'.format(txt_name))
     with open(txt_name, 'a') as f:
@@ -312,26 +384,40 @@ def _test_record(env, agent, trainOpt, episode, game_name, num_tests=NUM_EXPERI)
     return mean, txt_name
 
 
-def do_experiment(env, memory, agent, game_name, trainOpt='random'):
+def do_experiment(env, memory, agent, game_name, trainopt='random'):
     _sample_and_train = None
 
     # Training
-    if trainOpt == 'random':
-        env, agent = _random_sample(env, memory, agent, game_name, isRender=False)
-    elif trainOpt == 'initial':
-        env, agent = _initial_sample(env, memory, agent, game_name, isRender=False)
-    elif trainOpt == 'reuse':
-        env, agent = _reuse_sample(env, memory, agent, game_name, isRender=False)
+    if trainopt == 'random':
+        env, best_agent = _random_sample(env, memory, agent, game_name, isRender=False)
+    elif trainopt == 'initial':
+        env, best_agent = _initial_sample(env, memory, agent, game_name, isRender=False)
+    elif trainopt == 'initial2':
+        env, best_agent = _initial2_sample(env, memory, agent, game_name, isRender=False)
+    elif trainopt == 'reuse':
+        env, best_agent = _reuse_sample(env, memory, agent, game_name, isRender=False)
     else:
-        raise ValueError('wrong trainOpt')
+        raise ValueError('wrong trainopt')
 
     # Testing
-#    mean, txt_name = _test_record(env, agent, trainOpt, EPISODE, game_name, NUM_EXPERI)
+    reward_list = []
+    for j in range(NUM_TESTS_MIDDLE):
+        total_reward, _ = test_policy(env, best_agent)
+        reward_list.append(total_reward)
+    best_mean_reward = sum(reward_list) / NUM_TESTS_MIDDLE
+     
+    # Write csv
+    csv_name = get_test_record_title(game_name, EPISODE, trainopt, num_tests=NUM_EXPERI) + '.csv'
+    with open(csv_name, 'a') as f:
+        f.write("best {}\n".format(best_mean_reward))
+
+
+#    mean, txt_name = _test_record(env, agent, trainopt, EPISODE, game_name, NUM_EXPERI)
 #    print("testing mean : {}\n".format(mean))
-##    txt_name = get_test_record_title(game_name, EPISODE, trainOpt, NUM_EXPERI) + '.txt'
+##    txt_name = get_test_record_title(game_name, EPISODE, trainopt, NUM_EXPERI) + '.txt'
 ##    mean = 0
 ##    return mean, txt_name
-    return
+    return best_agent
 
 def _main(trainopt='initial'):
 
@@ -362,20 +448,49 @@ def _main(trainopt='initial'):
         else:
             raise ValueError('you should manually control it!')
 
-    #means = []
+
+    bin_name = get_test_record_title(game_name, EPISODE, 'initial2', num_tests=NUM_EXPERI) + '_pickle.bin'
+    print('bin_file duplication check!')
+    if os.path.isfile(txt_name):
+        print('Do you want to remove bin_file?\n')
+        answer = input()
+        if answer == 'y' or answer == 'Y':
+            os.remove(txt_name)
+        else:
+            raise ValueError('you should manually control it!')
+
     for i in range(NUM_EXPERI):
         if i % 10 == 0:
             print("testing ", i)
-        env.seed(i)
-        #mean, txt_name = do_experiment(env, memory, agent, game_name, trainOpt=trainopt)
-        do_experiment(env, memory, agent, game_name, trainOpt=trainopt)
-        #means.append(mean)
-    #meanmean = sum(means) / NUM_EXPERI
-    #with open(txt_name, 'a') as f:
-    #    f.write("meanmean {}\n".format(meanmean))
+        env.seed()
+        best_agent = do_experiment(env, memory, agent, game_name, trainopt=trainopt)
+
+
+def pickle_test():
+
+    env = gym.make('CartPole-v0')
+    
+    bin_name = get_test_record_title('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True) + '_pickle.bin'
+
+    with open('CartPole-v0_EPI1000_initial2_#Test1_important_sampling_pickle.bin', 'rb') as f:
+        best_agent_list = pickle.load(f)
+    
+    for i, agent in enumerate(best_agent_list):
+        if i != len(best_agent_list)-1:
+            continue
+        reward_list = []
+        for j in range(NUM_TESTS_MIDDLE):
+            total_reward, _ = test_policy(env, agent)
+            reward_list.append(total_reward)
+        mean_reward = sum(reward_list) / NUM_TESTS_MIDDLE
+
+        print(mean_reward)
+
 
 
 if __name__ == '__main__':
-    _main('random')
     #_main('initial')
-    #_main('reuse')
+    #_main('initial2')
+
+    pickle_test()
+

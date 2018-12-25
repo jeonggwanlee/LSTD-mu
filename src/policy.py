@@ -18,6 +18,12 @@ class Policy:
         else:
             self.weights = theta
 
+    def behavior(self, state, action):
+        if self.theta_behavior is None:
+            self.theta_behavior = np.random.uniform(-1.0, 1.0, size=(self.num_theta,))
+
+        vector_basis = self.basis_function.evaluate(state, action)
+        return np.dot(vector_basis, self.theta_behavior) # Phi * w
 
     def q_value_function(self, state, action):
         """ Q(s, a; w) = sum (pi(s, a) * weights)

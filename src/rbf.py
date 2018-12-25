@@ -23,6 +23,9 @@ class Basis_Function:
         """
         Calculate basis component. exp(-gamma * sum ( diff^2 ))
         ~ exp(-gamma * sum(square error))
+
+        less than 1, greater than 0
+        1 >= np.exp(-gamma * np.sum(mean_diff)) > 0
         """
         mean_diff = (state - mean)**2
         return np.exp(-gamma * np.sum(mean_diff))

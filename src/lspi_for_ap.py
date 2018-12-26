@@ -26,7 +26,6 @@ class LSPI_AP:
         epsilon : stopping criterion
         policy(pi) : initial policy
     """
-    #def __init__(self, num_actions=3, num_means=2, gamma=0.99):
     def __init__(self, num_actions=3, state_dim=2, gamma=0.99):
         """
         num_actions. Number of actions. Int.
@@ -48,14 +47,15 @@ class LSPI_AP:
         self.stop_criterion = 10**-5
         self.gamma = gamma
 
-    def _act(self, state):
+    def act(self, state):
         """ phi(s) = argmax_a Q(s, a) and pick first action
         """
         index = self.policy.get_actions(state)
         action = self.policy.actions[index[0]]
         return action
 
-    def train(self, sample, total_iteration, w_important_Sampling=False):
+#    def train(self, sample, total_iteration, w_important_Sampling=False):
+    def train(self, sample, w_important_Sampling=False):
         
         error = float('inf')
         num_iteration = 0

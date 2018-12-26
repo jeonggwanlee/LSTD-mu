@@ -14,18 +14,18 @@ BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 
 class IRL:
-    def __init__(self, reward_basis, theta, initial_policy, trajectories, gamma, state0, env):
+    def __init__(self, reward_basis, theta, initial_policy, expert_trajectories, gamma, state0, env):
         self.reward_basis = reward_basis
         self.initial_policy = initial_policy
-        self.trajectories = expert_trajectories
+        self.expert_trajectories = expert_trajectories
         self.gamma = gamma
         self.theta = theta
         self.state0 = state0
         self.env = env
         self.epsilon = 0.1
-        self.mu_expert = self.compute_feature_expectation(self.trajectories)
-        self.initial_trajectories = self._generate_trajectories_from_initial_policy()
-        self.mu_initial = self.compute_feature_expectation(self.initial_trajectories)
+        self.mu_expert = self.get_feature_expectation(self.expert_trajectories)
+        self.initial_trajectories = self.get_traj_from_initial_policy(self.env)
+        self.mu_initial = self.get_feature_expectation(self.initial_trajectories)
         self.mu_bar = self.mu_initial
         def experiment_setting(self):
             self.num_actions = self.env.action_space.n
@@ -35,14 +35,15 @@ class IRL:
         self.experiment_setting()
         self.irl_main()
 
-    def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
+    def get_traj_from_initial_policy(self):
+
         trajectories = []
-        for _ in range(n_trajectories):
+        for _ in range(1000):
             self.env.seed()
             state = self.env.reset()
             
             trajectory = []
-            for _ in range(TRANSITION): # TRANSITION
+            for _ in range(15000): # TRANSITION
                 #env.render()
                 if state[0] > 0: # right
                     action = 0 # go right
@@ -76,18 +77,18 @@ class IRL:
                     break
             # for _
             trajectories.append(trajectory)
-        # for _
-        return trajectories
+
+        return trajectory
 
 
-    def compute_feature_expectation(self, trajectories):
-        """ trajectories. (num_traj, traj_len, 5) = (100, 200, 5)
+    def get_feature_expectation(self, expert_trajectories):
+        """ expert_trajectories. (num_traj, traj_len, 5) = (100, 200, 5)
             
-         [[state, action, reward, next_state, done] ...]
         """
+        # [[state, action, reward, next_state, done] ...]
 
-        mu_sum = None
-        for i, one_traj in enumerate(trajectories):
+        mu_expert_sum = None
+        for i, one_traj in enumerate(expert_trajectories):
 
             one_mu = None
             gamma_update = 1.0 / self.gamma
@@ -102,13 +103,12 @@ class IRL:
                     one_mu += phi_time_unit
             
             if i == 0:
-                mu_sum = one_mu
+                mu_expert_sum = one_mu
             else:
-                mu_sum += one_mu
-            # for j
-        # for i
-        mu = mu_sum / len(trajectories)
-        return mu
+                mu_expert_sum += one_mu
+
+        mu_expert = mu_expert_sum / len(expert_trajectories)
+        return mu_expert
 
 
     def irl_main(self):
@@ -124,25 +124,56 @@ class IRL:
         theta_as_reward_space_param = self.mu_expert - self.mu_bar # theta
         t = np.linalg.norm(theta_as_reward_space_param, 2)
         print("Initial threshold: ", t)
-        iteration = 0
+        i = 0
         # R = pi w
         while t > self.epsilon:
 
             agent = LSPI_AP(self.num_actions, self.state_dim)
             best_agent = self.get_best_agent(self.env, self.memory, agent, 
                     theta_as_reward_space_param,
-                    isRender=False)
+                    'CartPole-v0', isRender=False)
             
-            new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
-            feature_expectations = self.compute_feature_expectation(new_trajectories)            
+            intermediate_mu_sum = None
+            for j in range(EPISODE):
+                self.env.seed()
+                state = self.env.reset()
+
+                one_mu = None
+                gamma_update = 1.0 / self.gamma
+                for k in range(TRANSITION):
+                    # Get Phi(s) * gamma
+                    phi_state = self.reward_basis.evaluate(state)
+                    gamma_update *= self.gamma
+                    phi_gamma = phi_state * gamma_update
+                    if k == 0:
+                        one_mu = phi_gamma
+                    else:
+                        one += phi_gamma
+                    
+                    # Act from best policy(agent) and Get next state
+                    action = best_agent._act(state)
+                    next_state, _, done, info = self.env.step(action)
+                    state = next_state
+                    if done:
+                        break
+                
+                if j == 0:
+                    intermediate_mu_sum = one_mu
+                else:
+                    intermediate_mu_sum += one_mu
+
+            # for j
+            intermediate_mu = intermediate_mu_sum / EPISODE
+                        
 
             # LSPI
             # w -> R -> Q -> mu -> updated_loss -> mu_bar -> w -> t
              
 
 
+    #def get_feature_expectation(self, state,):
 
-    def get_best_agent(self, env, memory, agent, theta, isRender=False):
+    def get_best_agent(self, env, memory, agent, theta, game_name, isRender=False):
 
     #state = sample[0]
     #phi_state = self.reward_basis.evaluate(state)
@@ -183,8 +214,9 @@ class IRL:
                 Best_agent = agent
                 Best_mean_reward = mean_reward
                 memory.clear_memory()
-        # for i
-                
+                #Best_agent_copy = copy.deepcopy(Best_agent)
+
+        
         # Clean up
         memory.clear_memory()
 

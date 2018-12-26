@@ -54,14 +54,14 @@ class LSPI_AP:
         action = self.policy.actions[index[0]]
         return action
 
-#    def train(self, sample, total_iteration, w_important_Sampling=False):
-    def train(self, sample, w_important_Sampling=False):
+#    def train(self, sample, total_iteration, w_important_sampling=False):
+    def train(self, sample, w_important_sampling=False):
         
         error = float('inf')
         num_iteration = 0
         epsilon = 0.001
 
-        if w_important_Sampling:
+        if w_important_sampling:
             new_weights = self.lstdq.train_weight_parameter(sample, self.policy)
         else:
             new_weights = self.lstdq.train_parameter(sample, self.policy)
@@ -71,7 +71,7 @@ class LSPI_AP:
         self.policy.update_weights(new_weights)
 
         #while (epsilon * (1 - self.gamma) / self.gamma) < error and num_iteration < total_iteration:
-        #    if w_important_Sampling:
+        #    if w_important_sampling:
         #        new_weights = self.lstdq.train_weight_parameter(sample, self.policy)
         #    else:
         #        new_weights = self.lstdq.train_parameter(sample, self.policy)

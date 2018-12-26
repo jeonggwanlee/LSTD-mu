@@ -19,10 +19,10 @@ class IRL:
     def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon):
         self.env = env
         self.reward_basis = reward_basis
-        self.expert_trajectories
+        self.expert_trajectories = expert_trajectories
         self.gamma = gamma
+        self.epsilon = epsilon
         self.theta = None
-        self.epsilon = 0.1
         def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
             trajectories = []
             for _ in range(n_trajectories):
@@ -47,7 +47,7 @@ class IRL:
             return trajectories
 
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
-        initial_trajectories = self._generate_trajectories_from_initial_policy()
+        initial_trajectories = _generate_trajectories_from_initial_policy(self)
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
         self.mu_bar = self.mu_initial
         def __experiment_setting(self):
@@ -55,32 +55,8 @@ class IRL:
             self.state_dim = self.env.observation_space.shape[0]
             action_dim = 1
             self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
-        self.__experiment_setting()
+        __experiment_setting(self)
 
-    def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
-        trajectories = []
-        for _ in range(n_trajectories):
-            self.env.seed()
-            state = self.env.reset()
-            
-            trajectory = []
-            for _ in range(TRANSITION): # TRANSITION
-                #env.render()
-                if state[0] > 0: # right
-                    action = 0 # go right
-                    next_state, reward, done, info = self.env.step(action)
-                else: # left
-                    action = 1 # go left
-                    next_state, reward, done, info = self.env.step(action)
-                trajectory.append([state, action, reward, next_state, done])
-                state = next_state
-                if done:
-                    break
-            # for j
-            trajectories.append(trajectory)
-        # for i
-
-        return trajectories
 
     def _generate_new_trajectories(self, agent, n_trajectories=1000):
         trajectories = []
@@ -126,11 +102,12 @@ class IRL:
         total_reward = 0.0
         self.env.seed()
         state = self.env.reset()
-        for i in range(5000):
+        for i in range(TRANSITION):
             if isRender:
                 self.env.render()
             phi = reward_basis.evaluate(state)
             approxi_reward = np.dot(phi, theta)
+            ipdb.set_trace()
             action = agent.act(state)
             next_state, _, done, _ = env.step(action)
             state = next_state
@@ -146,13 +123,13 @@ class IRL:
         Best_mean_reward = -4000
         mean_reward = -4000
         for _ in range(EPISODE):
-            env.seed()
-            state = env.reset()
+            self.env.seed()
+            state = self.env.reset()
             for j in range(TRANSITION):
                 if isRender:
-                    env.render()
-                action = env.action_space.sample()
-                next_state, _, done, _ = env.step(action)
+                    self.env.render()
+                action = self.env.action_space.sample()
+                next_state, _, done, _ = self.env.step(action)
                 phi_state = self.reward_basis.evaluate(state)
                 memory.add([state, action, phi_state, next_state, done])
                 state = next_state
@@ -164,12 +141,11 @@ class IRL:
             else:
                 sample = memory.select_sample(BATCH_SIZE)
             
-            agent.train(sample, important_sampling=True)
+            agent.train(sample, w_important_sampling=True)
             
             reward_list = []
             for j in range(NUM_EVALUATION):
-                total_reward, = self._test_policy_with_approxi_reward(env, 
-                                                                      agent,
+                total_reward, = self._test_policy_with_approxi_reward(agent, 
                                                                       self.reward_basis,
                                                                       theta)
                 reward_list.append(total_reward)
@@ -197,7 +173,7 @@ class IRL:
         while t > self.epsilon:
 
             agent = LSPI_AP(self.num_actions, self.state_dim)
-            best_agent = self._get_best_agent(self.env, self.memory, agent, 
+            best_agent = self._get_best_agent(self.memory, agent, 
                                               self.theta, isRender=False)
             
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
@@ -226,8 +202,8 @@ if __name__ == '__main__':
         feature_means = pickle.load(rf)
 
     env = gym.make("CartPole-v0")
-    reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
     gamma = 0.99
+    reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
     epsilon = 0.1
 
     irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon) 

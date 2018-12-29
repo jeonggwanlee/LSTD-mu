@@ -12,10 +12,10 @@ from record import get_test_record_title
 
 TRANSITION = 15000
 EPISODE = 1000
-BATCH_SIZE = 400
+BATCH_SIZE = 300
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EXPERI = 1
-NUM_TESTS_MIDDLE = 1000
+NUM_TESTS_MIDDLE = 200
 TRAINOPT = ['random', 'initial', 'initial2', 'reuse']
 
 important_sampling = True
@@ -108,7 +108,7 @@ def _random_sample(env, memory, agent, game_name, isRender=False):
             f.write("{},{},{},{}\n".format(middle, best, worst, error))
 
         # Print iteration
-        if i % 10 == 0:
+        if i % 1 == 0:
             print('[episode {}] done'.format(i))
 
     # for i in range(EPISODE)
@@ -137,7 +137,7 @@ def _initial2_sample(env, memory, agent, game_name, isRender=False):
         # Intializaiton
         env.seed()
         state = env.reset()
-
+        
         # Collect samples 
         for j in range(TRANSITION):
             if isRender:
@@ -155,12 +155,13 @@ def _initial2_sample(env, memory, agent, game_name, isRender=False):
         else:
             sample = memory.select_sample(BATCH_SIZE)
         error = agent.train(sample, lspi_iteration, important_sampling)
-
         # Get middle mean
         reward_list = []
         for j in range(NUM_TESTS_MIDDLE):
             total_reward, _ = test_policy(env, agent)
             reward_list.append(total_reward)
+            if j % 10 == 0:
+                print("test_policy j : {}/{}".format(j, NUM_TESTS_MIDDLE))
         mean_reward = sum(reward_list) / NUM_TESTS_MIDDLE
 
         # Write csv
@@ -344,45 +345,6 @@ def _reuse_sample(env, memory, agent, game_name, isRender=False):
     return env, agent
 
 
-def test_policy(env, agent, isRender=False):
-    total_reward = 0.0
-    best_policy = 0
-    env.seed()
-
-    state = env.reset()
-    for i in range(5000):
-        if isRender:
-            env.render()
-        action = agent._act(state)
-        next_state, reward, done, info = env.step(action)
-        state = next_state
-
-        total_reward += reward
-        if done:
-            best_policy = agent.policy
-            break
-
-    return total_reward, best_policy
-
-
-def _test_record(env, agent, trainopt, episode, game_name, num_tests=NUM_EXPERI):
-    """DEPRECATED
-    """
-
-    be_meaned = []
-    txt_name = get_test_record_title(game_name, episode, trainopt, num_tests) + '.txt'
-
-    #print('...recoding({})...'.format(txt_name))
-    with open(txt_name, 'a') as f:
-        f.write(datetime.datetime.now().strftime('Record time : %Y-%m-%d_%H-%M-%S\n'))
-        for i in range(num_tests):
-            total_reward, _ = test_policy(env, agent)
-            #f.write('{}\n'.format(total_reward))
-            be_meaned.append(total_reward)
-        mean = sum(be_meaned) / num_tests
-        f.write('testing mean : {}\n'.format(mean))
-    return mean, txt_name
-
 
 def do_experiment(env, memory, agent, game_name, trainopt='random'):
     _sample_and_train = None
@@ -411,17 +373,11 @@ def do_experiment(env, memory, agent, game_name, trainopt='random'):
     with open(csv_name, 'a') as f:
         f.write("best {}\n".format(best_mean_reward))
 
-
-#    mean, txt_name = _test_record(env, agent, trainopt, EPISODE, game_name, NUM_EXPERI)
-#    print("testing mean : {}\n".format(mean))
-##    txt_name = get_test_record_title(game_name, EPISODE, trainopt, NUM_EXPERI) + '.txt'
-##    mean = 0
-##    return mean, txt_name
     return best_agent
 
-def _main(trainopt='initial'):
+def _main(trainopt='initial2'):
 
-    agent, env, memory, game_name = experiment_2()
+    agent, env, memory, game_name = experiment_1()
     #trainopt = 'initial'
     assert trainopt in TRAINOPT
 
@@ -468,11 +424,14 @@ def _main(trainopt='initial'):
 
 def pickle_test():
 
-    env = gym.make('CartPole-v0')
-    
-    bin_name = get_test_record_title('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True) + '_pickle.bin'
+    #env = gym.make('CartPole-v0')
+    env = gym.make('Acrobot-v1')
 
-    with open('CartPole-v0_EPI1000_initial2_#Test1_important_sampling_pickle.bin', 'rb') as f:
+    #bin_name = get_test_record_title('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True) + '_pickle.bin'
+    bin_name = get_test_record_title('Acrobot-v1', 1000, 'initial2', num_tests=1, important_sampling=True) + '_pickle.bin'
+
+    #with open('CartPole-v0_EPI1000_initial2_#Test1_important_sampling_pickle.bin', 'rb') as f:
+    with open('Acrobot-v1_EPI1000_initial2_#Test1_important_sampling_pickle.bin', 'rb') as f:
         best_agent_list = pickle.load(f)
     
     for i, agent in enumerate(best_agent_list):
@@ -480,7 +439,7 @@ def pickle_test():
             continue
         reward_list = []
         for j in range(NUM_TESTS_MIDDLE):
-            total_reward, _ = test_policy(env, agent)
+            total_reward, _ = test_policy(env, agent, True)
             reward_list.append(total_reward)
         mean_reward = sum(reward_list) / NUM_TESTS_MIDDLE
 

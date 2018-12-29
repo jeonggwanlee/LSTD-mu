@@ -38,13 +38,13 @@ class Memory:
         """
         obs_dim = self.obs_dim
         act_dim = self.act_dim
-    
+         
         current_state = [x[0] for x in sample]
         actions =       np.asarray([x[1] for x in sample])
         rewards =       [x[2] for x in sample]
         next_state =    [x[3] for x in sample]
         done =          [x[4] for x in sample]
-        
+
         current_state = np.resize(current_state, [batch_size, obs_dim])
         next_state    = np.resize(next_state, [batch_size, obs_dim])
         if act_dim > 1:
@@ -55,7 +55,7 @@ class Memory:
             actions       = np.asarray(actions)
             rewards       = np.asarray(rewards)
             done          = np.asarray(done)
-
+        
 
         return [current_state, actions, rewards, next_state, done]
 

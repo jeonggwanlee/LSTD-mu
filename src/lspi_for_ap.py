@@ -1,6 +1,6 @@
 import numpy as np
 from rbf import Basis_Function
-from policy import Policy
+from policy_for_ap import Policy
 import ipdb
 
 """
@@ -33,9 +33,9 @@ class LSPI_AP:
         gamma. Float.
         """
         
-        print ("LSPI init!")
-        print ("num_actions : %d, state_dim(dim_of_states) : %d" %
-                (num_actions, state_dim))
+        #print ("LSPI init!")
+        #print ("num_actions : %d, state_dim(dim_of_states) : %d" %
+        #        (num_actions, state_dim))
 
         num_features = state_dim + 1 # for convenience 
         self.basis_function = Basis_Function(state_dim, num_features, num_actions, gamma)
@@ -134,7 +134,6 @@ class LSTD_mu:
         """ Compute Q value function of current policy
             to obtain the greedy policy
         """
-
         k = self.basis_function._num_basis()
         A = np.zeros([k, k])
         b = np.zeros([k, 1])
@@ -188,7 +187,8 @@ class LSTD_mu:
 
         inv_A = np.linalg.inv(A)
         theta = np.dot(inv_A, b)
-
+        
+        assert theta.shape == (k, 1)
         return theta
 
 

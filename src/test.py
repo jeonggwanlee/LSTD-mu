@@ -47,6 +47,27 @@ def test_agent(game_name, agent, num_iteration, isRender=False):
     print("[test results] : {} (num_iteration : {})".format(mean_reward, num_iteration))
     return mean_reward
 
+
+def _test_record(env, agent, trainopt, episode, game_name, num_tests=NUM_EXPERI):
+    """DEPRECATED
+    """
+
+    be_meaned = []
+    txt_name = get_test_record_title(game_name, episode, trainopt, num_tests) + '.txt'
+
+    #print('...recoding({})...'.format(txt_name))
+    with open(txt_name, 'a') as f:
+        f.write(datetime.datetime.now().strftime('Record time : %Y-%m-%d_%H-%M-%S\n'))
+        for i in range(num_tests):
+            total_reward, _ = test_policy(env, agent)
+            #f.write('{}\n'.format(total_reward))
+            be_meaned.append(total_reward)
+        mean = sum(be_meaned) / num_tests
+        f.write('testing mean : {}\n'.format(mean))
+    return mean, txt_name
+
+
+
 if __name__ == "__main__":
     NUM_TEST_ITER = 100
     best_agent = get_best_agent('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True)

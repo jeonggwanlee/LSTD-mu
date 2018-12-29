@@ -3,6 +3,7 @@ import ipdb
 import gym
 import numpy as np
 import copy
+import os
 
 from reward_basis import RewardBasis, Theta
 from record import get_test_record_title
@@ -10,10 +11,10 @@ from replay_memory import Memory
 from lspi_for_ap import LSPI_AP
 
 TRANSITION = 15000
-EPISODE = 1000
+EPISODE = 20
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
-NUM_EVALUATION = 1000
+NUM_EVALUATION = 100
 
 class IRL:
     def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon):
@@ -23,6 +24,12 @@ class IRL:
         self.gamma = gamma
         self.epsilon = epsilon
         self.theta = None
+
+        self.num_actions = self.env.action_space.n
+        self.state_dim = self.env.observation_space.shape[0]
+        action_dim = 1
+        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
+
         def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
             trajectories = []
             for _ in range(n_trajectories):
@@ -50,12 +57,6 @@ class IRL:
         initial_trajectories = _generate_trajectories_from_initial_policy(self)
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
         self.mu_bar = self.mu_initial
-        def __experiment_setting(self):
-            self.num_actions = self.env.action_space.n
-            self.state_dim = self.env.observation_space.shape[0]
-            action_dim = 1
-            self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
-        __experiment_setting(self)
 
 
     def _generate_new_trajectories(self, agent, n_trajectories=1000):
@@ -66,9 +67,9 @@ class IRL:
 
             trajectory = []
             for _ in range(TRANSITION):
-                action = agent._act(state)
+                action = agent.act(state)
                 next_state, reward, done, _ = self.env.step(action)
-                self.memory.add([state, action, reward, next_state, done])
+                trajectory.append([state, action, reward, next_state, done])
                 state = next_state
                 if done:
                     break
@@ -89,11 +90,15 @@ class IRL:
                 phi_state = self.reward_basis.evaluate(state)
                 gamma_update *= self.gamma
                 phi_time_unit = phi_state * gamma_update
-                if j == 0: one_mu = phi_time_unit
-                else: one_mu += phi_time_unit
+                if j == 0: 
+                    one_mu = phi_time_unit
+                else: 
+                    one_mu += phi_time_unit
             # for j
-            if i == 0: mu_sum = one_mu
-            else: mu_sum += one_mu
+            if i == 0: 
+                mu_sum = one_mu
+            else: 
+                mu_sum += one_mu
         # for i
         mu = mu_sum / len(trajectories)
         return mu
@@ -102,14 +107,13 @@ class IRL:
         total_reward = 0.0
         self.env.seed()
         state = self.env.reset()
-        for i in range(TRANSITION):
+        for _ in range(TRANSITION):
             if isRender:
                 self.env.render()
             phi = reward_basis.evaluate(state)
             approxi_reward = np.dot(phi, theta)
-            ipdb.set_trace()
             action = agent.act(state)
-            next_state, _, done, _ = env.step(action)
+            next_state, _, done, _ = self.env.step(action)
             state = next_state
             total_reward += approxi_reward 
             if done:
@@ -122,7 +126,8 @@ class IRL:
         Best_agent = None
         Best_mean_reward = -4000
         mean_reward = -4000
-        for _ in range(EPISODE):
+        # 1000 * 100
+        for i in range(EPISODE):
             self.env.seed()
             state = self.env.reset()
             for j in range(TRANSITION):
@@ -131,7 +136,8 @@ class IRL:
                 action = self.env.action_space.sample()
                 next_state, _, done, _ = self.env.step(action)
                 phi_state = self.reward_basis.evaluate(state)
-                memory.add([state, action, phi_state, next_state, done])
+                reward = np.dot(phi_state, theta)
+                memory.add([state, action, reward, next_state, done])
                 state = next_state
                 if done:
                     break
@@ -145,16 +151,20 @@ class IRL:
             
             reward_list = []
             for j in range(NUM_EVALUATION):
-                total_reward, = self._test_policy_with_approxi_reward(agent, 
-                                                                      self.reward_basis,
+                total_reward = self._test_policy_with_approxi_reward(agent, self.reward_basis,
                                                                       theta)
                 reward_list.append(total_reward)
             mean_reward = sum(reward_list) / NUM_EVALUATION
 
             if Best_mean_reward < mean_reward:
+                print("Get Best reward {}".format(mean_reward))
                 Best_agent = copy.deepcopy(agent)
                 Best_mean_reward = mean_reward
                 memory.clear_memory()
+            
+            if i % 20 == 0:
+                print("i : {}/{}".format(i, EPISODE))
+            
         # for i
         # Clean up
         memory.clear_memory()
@@ -168,22 +178,36 @@ class IRL:
         t = np.linalg.norm(self.theta, 2)
         print("Initial threshold: ", t)
         iteration = 0
-        ipdb.set_trace()
+        Best_agents = []
+        t_collection = []
+        best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_pickle.bin"
         # R = pi w
         while t > self.epsilon:
-
             agent = LSPI_AP(self.num_actions, self.state_dim)
             best_agent = self._get_best_agent(self.memory, agent, 
                                               self.theta, isRender=False)
-            
+            Best_agents.append(best_agent)
+
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
             mu = self.compute_feature_expectation(new_trajectories)            
             updated_loss = mu - self.mu_bar
-            self.mu_bar += updated_loss * updated_loss.dot(w) / np.square(updated_loss).sum()
-            theta = self.mu_expert - self.mu_bar
-            t = np.linalg.norm(theta, 2)
+            self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
+            self.theta = self.mu_expert - self.mu_bar
+            t = np.linalg.norm(self.theta, 2)
+            t_collection.append(t)
+            print("iteration: ", iteration)
+            print("threshold: ", t)
+            if iteration > 1:
+                print("threshold_gap: ", t_collection[-1] - t_collection[-2])
             iteration += 1
-             
+
+            if os.path.exists(best_policy_bin_name):
+                os.remove(best_policy_bin_name)
+            with open(best_policy_bin_name, 'wb') as f:
+                pickle.dump([Best_agents, t_collection], f)
+
+        ipdb.set_trace()
+        
         return
 
 

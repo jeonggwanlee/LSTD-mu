@@ -122,6 +122,7 @@ class LSTDQ:
             loss = np.resize(phi, [1, len(loss)])
 
             A = A + np.dot(phi, loss)
+            ipdb.set_trace()
             b = b + (phi * rewards[i])
         #end for i in range(len(states)):
 

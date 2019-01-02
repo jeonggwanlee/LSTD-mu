@@ -4,11 +4,13 @@ import gym
 import numpy as np
 import copy
 import os
+import tensorflow as tf
 
 from reward_basis import RewardBasis, Theta
 from record import get_test_record_title
 from replay_memory import Memory
 from lspi_for_ap import LSPI_AP
+import tf_utils
 
 TRANSITION = 15000
 EPISODE = 20
@@ -16,8 +18,36 @@ BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
 
-class IRL:
-    def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon):
+
+class DeepActionNetwork:
+    def __init__(self, n_input=4, n_h1=3, n_h2=3, n_output=2, lr=0.1, name="deep_action"):
+        self.n_input = n_input
+        self.n_h1 = n_h1
+        self.n_h2 = n_h2
+        self.n_output = n_output
+        self.lr = lr
+        self.name = name
+
+    def _build_network(self, name):
+        input_s = tf.placeholder(tf,float32, [None, self.n_input])
+        with tf.variable_scope(name):
+            fc1 = tf_utils.fc(input_s, self.n_h1, scope="fc1",
+                    activation_fn=tf.nn.elu,
+                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
+            fc2 = tf_utils.fc(fc1, self.n_h2, scope="fc2",
+                    activation_fn=tf.nn.elu,
+                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
+            reward = tf_utils.fc(fc2, self.n_output, scope="action")
+            theta = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=name)
+        return input_s, reward, theta
+
+
+
+
+
+class DEEPIRL:
+    def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon,
+            n_input, lr, n_h1, n_h2, name='deep_irl'):
         self.env = env
         self.reward_basis = reward_basis
         self.expert_trajectories = expert_trajectories
@@ -28,12 +58,17 @@ class IRL:
         self.num_actions = self.env.action_space.n
         self.state_dim = self.env.observation_space.shape[0]
         action_dim = 1
-        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
+        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim) 
 
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
-        initial_trajectories = _generate_trajectories_from_initial_policy(self)
-        self.mu_initial = self.compute_feature_expectation(initial_trajectories)
-        self.mu_bar = self.mu_initial
+
+        self.n_input = n_input
+        self.lr = lr
+        self.n_h1 = n_h1
+        self.n_h2 = n_h2
+        self.name = name
+
+        self.sess = tf.Session()
 
 
     def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):

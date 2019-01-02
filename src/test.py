@@ -2,6 +2,8 @@ import gym
 from record import get_test_record_title
 import pickle
 
+NUM_EXPERI =1
+
 def get_best_agent(game_name, episode, trainopt, num_tests=1, important_sampling=True):
 
     experiment_name = get_test_record_title(game_name, episode, trainopt, num_tests, important_sampling)

@@ -51,3 +51,11 @@ class Basis_Function:
         phi[offset + 1: offset + 1 + len(rbf)] = rbf
 
         return phi
+
+    def evaluate_state(self, state):
+
+        rbf = [self.__calc_basis_component(state, mean, self.gamma) for mean in self.feature_means]
+        phi_state = [1.]
+        phi_state += rbf
+
+        return phi_state

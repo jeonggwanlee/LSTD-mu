@@ -4,11 +4,12 @@ import gym
 import numpy as np
 import copy
 import os
+import datetime
 
 from reward_basis import RewardBasis, Theta
 from record import get_test_record_title
 from replay_memory import Memory
-from lspi_for_ap import LSPI_AP
+from lspi_for_apmu import LSPI_APMU
 
 TRANSITION = 15000
 EPISODE = 20
@@ -29,11 +30,7 @@ class IRL:
         self.state_dim = self.env.observation_space.shape[0]
         action_dim = 1
         self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
-
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
-        initial_trajectories = _generate_trajectories_from_initial_policy(self)
-        self.mu_initial = self.compute_feature_expectation(initial_trajectories)
-        self.mu_bar = self.mu_initial
 
 
     def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
@@ -147,8 +144,8 @@ class IRL:
             else:
                 sample = memory.select_sample(BATCH_SIZE)
             
-            agent.train(sample, w_important_sampling=True)
-            
+            error, new_weights = agent.train_and_get_mu(sample, w_important_sampling=True)
+
             reward_list = []
             for j in range(NUM_EVALUATION):
                 total_reward = self._test_policy_with_approxi_reward(agent, self.reward_basis,
@@ -191,14 +188,33 @@ class IRL:
         # 3.
         while t > self.epsilon:
             # 4.
-            agent = LSPI_AP(self.num_actions, self.state_dim)
+            agent = LSPI_APMU(self.num_actions, self.state_dim)
             best_agent = self._get_best_agent(self.memory, agent, 
                                               self.theta, isRender=False)
-            Best_agents.append(best_agent)
 
-            new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
-            mu = self.compute_feature_expectation(new_trajectories)            
-            updated_loss = mu - self.mu_bar
+            xi = np.reshape(best_agent.policy.weights, [-1])
+            Best_agents.append(best_agent)
+            bf = best_agent.basis_function
+            
+            #start = datetime.datetime.now()
+            psi_sum = np.zeros((10,))
+            for i in range(1000):
+                psi = bf.evaluate(self.env.reset(), self.env.action_space.sample())
+                psi_sum += psi
+            psi = psi_sum / 1000
+            mu_origin = psi * xi
+            ##first_end = datetime.datetime.now()
+            ##first_end_result = first_end - start
+            #new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
+            #mu = self.compute_feature_expectation(new_trajectories)
+            ##second_end = datetime.datetime.now()
+            ##second_end_result = second_end - first_end
+            ##ipdb.set_trace()
+
+            #print("gap : ", np.linalg.norm(mu_origin - mu))
+
+            #updated_loss = mu - self.mu_bar
+            updated_loss = mu_origin - self.mu_bar
             self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
             self.theta = self.mu_expert - self.mu_bar
             t = np.linalg.norm(self.theta, 2)
@@ -213,7 +229,7 @@ class IRL:
                 os.remove(best_policy_bin_name)
             with open(best_policy_bin_name, 'wb') as f:
                 pickle.dump([Best_agents, t_collection], f)
-
+        # end while
         ipdb.set_trace()
         
         return

@@ -30,34 +30,35 @@ class IRL:
         action_dim = 1
         self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
 
+        def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
+            trajectories = []
+            for _ in range(n_trajectories):
+                self.env.seed()
+                state = self.env.reset()
+                trajectory = []
+                for _ in range(TRANSITION): # TRANSITION
+                    #env.render()
+                    if state[0] > 0: # right
+                        action = 0 # go right
+                        next_state, reward, done, info = self.env.step(action)
+                    else: # left
+                        action = 1 # go left
+                        next_state, reward, done, info = self.env.step(action)
+                    trajectory.append([state, action, reward, next_state, done])
+                    state = next_state
+                    if done:
+                        break
+                # for j
+                trajectories.append(trajectory)
+            # for i
+            return trajectories
+
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
+        ipdb.set_trace()
         initial_trajectories = _generate_trajectories_from_initial_policy(self)
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
         self.mu_bar = self.mu_initial
 
-
-    def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
-        trajectories = []
-        for _ in range(n_trajectories):
-            self.env.seed()
-            state = self.env.reset()
-            trajectory = []
-            for _ in range(TRANSITION): # TRANSITION
-                #env.render()
-                if state[0] > 0: # right
-                    action = 0 # go right
-                    next_state, reward, done, info = self.env.step(action)
-                else: # left
-                    action = 1 # go left
-                    next_state, reward, done, info = self.env.step(action)
-                trajectory.append([state, action, reward, next_state, done])
-                state = next_state
-                if done:
-                    break
-            # for j
-            trajectories.append(trajectory)
-        # for i
-        return trajectories
 
     def _generate_new_trajectories(self, agent, n_trajectories=1000):
         trajectories = []
@@ -174,12 +175,7 @@ class IRL:
 
     def loop(self):
 
-        # 1.
-        initial_trajectories = self._generate_trajectories_from_initial_policy()
-        self.mu_initial = self.compute_feature_expectation(initial_trajectories)
-
         # 2.
-        self.mu_bar = self.mu_initial
         self.theta = self.mu_expert - self.mu_bar # theta
         t = np.linalg.norm(self.theta, 2)
         print("Initial threshold: ", t)
@@ -188,7 +184,6 @@ class IRL:
         t_collection = []
         best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_pickle.bin"
         # R = pi w
-        # 3.
         while t > self.epsilon:
             # 4.
             agent = LSPI_AP(self.num_actions, self.state_dim)

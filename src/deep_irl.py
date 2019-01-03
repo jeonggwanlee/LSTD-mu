@@ -23,19 +23,21 @@ NUM_EVALUATION = 100
 
 
 class DeepActionNetwork:
+    """ Deep
+    """
     def __init__(self,
-            session,
-            epsilon=0.5,
-            epsilon_anneal=0.01,
-            end_epsilon=0.1,
-            lr=0.05,
-            gamma=0.99,
-            state_size=4,
-            action_size=2,
-            n_h1=20,
-            n_h2=20,
-            scope="deep_action"
-            ):
+                 session,
+                 epsilon=0.5,
+                 epsilon_anneal=0.005,
+                 end_epsilon=0.1,
+                 lr=0.05,
+                 gamma=0.99,
+                 state_size=4,
+                 action_size=2,
+                 n_h1=20,
+                 n_h2=20,
+                 scope="deep_action"
+                ):
         self.sess = session
         self.epsilon = epsilon
         self.epsilon_anneal = epsilon_anneal
@@ -79,11 +81,8 @@ class DeepActionNetwork:
         for i in range(len(expert_trajectories)):
             for j in range(len(expert_trajectories[i])):
                 expert_trajs_flat.append(expert_trajectories[i][j])
-        
         random.shuffle(expert_trajs_flat)
-        
         batch_end = 0
-        
         for i in range(1000):
             if batch_end + batch_size > len(expert_trajs_flat):
                 batch_end = 0
@@ -136,6 +135,7 @@ class DeepRewardNetwork:
         self.scope = scope
         theta = self._build_network()
         init_new_vars_op = tf.variables_initializer(theta)
+        ipdb.set_trace()
         self.sess.run(init_new_vars_op)
 
     def _build_network(self):
@@ -173,7 +173,7 @@ class DeepRewardNetwork:
         batch_size = 100
         batch_end = 0
         
-        for i in range(1000):
+        for i in range(500):
             if batch_end + batch_size > len(trajectories):
                 batch_end = 0
                 random.shuffle(trajectories)
@@ -223,21 +223,24 @@ class DeepRewardNetwork:
                     print("gap : {}\n".format(gap))
                 """
         # for end
-        ipdb.set_trace()
 
 
     def get_reward(self, state):
         reward = self.sess.run(self.reward_pred, feed_dict={self.state_input:[state]})
-        return reward[0][0]
+        return reward.reshape([-1])[0]
 
+    def get_rewards(self, states):
+        reward = self.sess.run(self.reward_pred, feed_dict={self.state_input:states})
+        return reward.reshape([-1])
 
 class DQN:
     def __init__(self,
             session,
-            epsilon=0.5,
+            rnet,
+            epsilon=1,
             epsilon_anneal=0.01,
             end_epsilon=0.1,
-            lr=0.005,
+            lr=0.001,
             gamma=0.9,
             state_size=4,
             action_size=2,
@@ -246,6 +249,7 @@ class DQN:
             scope="dqn"
             ):
         self.sess = session
+        self.rnet = rnet
         self.epsilon = epsilon
         self.epsilon_anneal = epsilon_anneal
         self.end_epsilon = end_epsilon
@@ -259,6 +263,9 @@ class DQN:
         theta = self._build_network()
         init_new_vars_op = tf.variables_initializer(theta)
         self.sess.run(init_new_vars_op)
+        self.memory = []
+        self.memory_size = 0
+        self.memory_limit = 10000
 
     def _build_network(self):
         with tf.variable_scope(self.scope):
@@ -282,10 +289,106 @@ class DQN:
             theta = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
         return theta
 
-    def learn(self):
+    def memory_add(self, state, action, next_state, reward, done):
+        if self.memory_size + 1 >= self.memory_limit:
+            self.memory_size -= 1
+            self.memory = self.memory[1:]
+        self.memory.append([state, action, next_state, reward, done])
+        self.memory_size += 1
+
+    def learn(self, env):
+        NUM_EPISODES = 300
+        MAX_STEPS = 300
+        EPOCH_SIZE = 100
+        BATCH_SIZE = 32
+        START_MEM = 100
+        for iter in range(NUM_EPISODES):
+            state = env.reset()
+            for t in range(MAX_STEPS):
+                action = self.get_action(state)
+                next_state, _, done, info = env.step(action)
+                reward = self.rnet.get_reward(state)
+                if done:
+                    reward = 0
+                    self.memory_add(state, action, next_state, reward, done)
+                    print("Episode {} finished after {} timesteps".format(iter, t+1))
+                    #yield t + 1
+                    break
+                self.memory_add(state, action, next_state, reward, done)
+                state = next_state
+            self.epsilon_decay()
+
+            # nsteps
+            for _ in range(EPOCH_SIZE):
+                #if self.memory_size < BATCH_SIZE:
+                #    batch = random.sample(self.memory, self.memory_size)
+                #else:
+                #    batch = random.sample(self.memory, BATCH_SIZE)
+                if self.memory_size < START_MEM:
+                    break
+                batch = random.sample(self.memory, BATCH_SIZE)
+                # state action next_state reward, done
+                next_state_batch = [b[2] for b in batch]
+                q_values = self.sess.run(self.q_values, feed_dict={self.state_input:
+                                                                   next_state_batch})
+                max_q_values = q_values.max(axis=1)
+
+                cur_state_batch = [b[0] for b in batch]
+                action_batch = [b[1] for b in batch]
+                reward_batch = [b[3] for b in batch]
+                target_q = np.array([reward_batch[k] + self.gamma*max_q_values[k]*(1-b[4]) for k, b in enumerate(batch)])
+                target_q = target_q.reshape([len(batch)])
+                # minimize the TD-error
+
+                l, _ = self.sess.run([self.loss, self.train_op], feed_dict={ self.state_input: cur_state_batch,
+                                                                             self.target_q: target_q,
+                                                                             self.action: action_batch })
+            # for j
+            
+            if self.memory_size > START_MEM and iter % 1 == 0:
+                print("i : {}/{}\n".format(iter, 100))
+                print("l : {}\n".format(l))
+        # for i
+        ipdb.set_trace()
+
+        while True:
+            cur_state = env.reset()
+            done = False
+            t = 0
+            while not done:
+                env.render()
+                t = t + 1
+                action = self.get_optimal_action(cur_state)
+                next_state, reward, done, info = env.step(action)
+                cur_state = next_state
+                if done:
+                    print("{} timesteps".format(t+1))
+                    break
 
 
+    def get_optimal_action(self, state):
+        actions = self.sess.run(self.q_values, feed_dict={self.state_input: [state]})
+        return actions.argmax()
+    
+    def get_action(self, state):
+        """
+        Epsilon-greedy action
 
+        args
+            state       current state
+        returns
+            an action to take given the state
+        """
+        if np.random.random() < self.epsilon:
+            return np.random.randint(0, self.action_size)
+        else:
+            return self.get_optimal_action(state)
+
+    def epsilon_decay(self):
+        if self.epsilon > self.end_epsilon:
+            self.epsilon = self.epsilon - self.epsilon_anneal
+        
+        print("self.epsilon : {}\n".format(self.epsilon))
 
 class DEEPIRL:
     def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon,
@@ -526,4 +629,5 @@ if __name__ == '__main__':
 
     drn.learn(env)
 
-
+    dqn = DQN(sess, drn)
+    dqn.learn(env)

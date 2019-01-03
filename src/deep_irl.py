@@ -1,3 +1,5 @@
+"""
+"""
 import pickle
 import ipdb
 import gym
@@ -5,6 +7,7 @@ import numpy as np
 import copy
 import os
 import tensorflow as tf
+import random
 
 from reward_basis import RewardBasis, Theta
 from record import get_test_record_title
@@ -20,27 +23,266 @@ NUM_EVALUATION = 100
 
 
 class DeepActionNetwork:
-    def __init__(self, n_input=4, n_h1=3, n_h2=3, n_output=2, lr=0.1, name="deep_action"):
-        self.n_input = n_input
+    def __init__(self,
+            session,
+            epsilon=0.5,
+            epsilon_anneal=0.01,
+            end_epsilon=0.1,
+            lr=0.05,
+            gamma=0.99,
+            state_size=4,
+            action_size=2,
+            n_h1=20,
+            n_h2=20,
+            scope="deep_action"
+            ):
+        self.sess = session
+        self.epsilon = epsilon
+        self.epsilon_anneal = epsilon_anneal
+        self.end_epsilon = end_epsilon
+        self.lr = lr
+        self.gamma = gamma
+        self.state_size = state_size
+        self.action_size = action_size
         self.n_h1 = n_h1
         self.n_h2 = n_h2
-        self.n_output = n_output
-        self.lr = lr
-        self.name = name
+        self.scope = scope
+        theta = self._build_network()
+        init_new_vars_op = tf.variables_initializer(theta)
+        self.sess.run(init_new_vars_op)
 
-    def _build_network(self, name):
-        input_s = tf.placeholder(tf,float32, [None, self.n_input])
-        with tf.variable_scope(name):
-            fc1 = tf_utils.fc(input_s, self.n_h1, scope="fc1",
+    def _build_network(self):
+        with tf.variable_scope(self.scope):
+            self.state_input = tf.placeholder(tf.float32, [None, self.state_size])
+            self.action = tf.placeholder(tf.int32, [None])
+            fc1 = tf_utils.fc(self.state_input, self.n_h1, scope="fc1",
                     activation_fn=tf.nn.elu,
                     initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
             fc2 = tf_utils.fc(fc1, self.n_h2, scope="fc2",
                     activation_fn=tf.nn.elu,
                     initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
-            reward = tf_utils.fc(fc2, self.n_output, scope="action")
-            theta = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=name)
-        return input_s, reward, theta
+            self.q_value = tf_utils.fc(fc2, self.action_size, activation_fn=None)
 
+            self.action_pred = tf.nn.softmax(self.q_value, name="action")
+            self.action_target = tf.one_hot(self.action, self.action_size, on_value=1.0, off_value=0.0)
+        
+            self.loss = tf.reduce_mean(tf.square(tf.subtract(self.action_pred, self.action_target)))
+            self.optimizer = tf.train.AdamOptimizer(self.lr)
+            self.train_op = self.optimizer.minimize(self.loss, global_step=tf.train.get_global_step())
+            theta = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
+
+        return theta
+
+    def learn(self, expert_trajectories):
+        batch_size = 100
+        expert_trajs_flat = []
+        for i in range(len(expert_trajectories)):
+            for j in range(len(expert_trajectories[i])):
+                expert_trajs_flat.append(expert_trajectories[i][j])
+        
+        random.shuffle(expert_trajs_flat)
+        
+        batch_end = 0
+        
+        for i in range(1000):
+            if batch_end + batch_size > len(expert_trajs_flat):
+                batch_end = 0
+                random.shuffle(expert_trajs_flat)
+            batch_expert_trajs = expert_trajs_flat[batch_end:batch_end+batch_size]
+            cur_state_batch = [s[0] for s in batch_expert_trajs]
+            cur_action_batch = [s[1] for s in batch_expert_trajs]
+            l, _ = self.sess.run([self.loss, self.train_op], feed_dict={self.state_input:cur_state_batch,
+                                                                        self.action:cur_action_batch})
+            batch_end += batch_size
+            if i % 10 == 0:
+                print("i {}, {}".format(i, l))
+
+    def get_optimal_action(self, state):
+        actions = self.sess.run(self.action_pred, feed_dict={self.state_input: [state]})
+        return actions.argmax()
+
+   
+    def get_q_value(self, state):
+        q_value = self.sess.run(self.action_pred, feed_dict={self.state_input: [state]})
+        return q_value
+
+
+class DeepRewardNetwork:
+    def __init__(self,
+            session,
+            qnet,
+            epsilon=0.5,
+            epsilon_anneal=0.01,
+            end_epsilon=0.1,
+            lr=0.005,
+            gamma=0.9,
+            state_size=4,
+            action_size=2,
+            n_h1=20,
+            n_h2=20,
+            scope="deep_reward"
+            ):
+        self.sess = session
+        self.qnet = qnet
+        self.epsilon = epsilon
+        self.epsilon_anneal = epsilon_anneal
+        self.end_epsilon = end_epsilon
+        self.lr = lr
+        self.gamma = gamma
+        self.state_size = state_size
+        self.action_size = action_size
+        self.n_h1 = n_h1
+        self.n_h2 = n_h2
+        self.scope = scope
+        theta = self._build_network()
+        init_new_vars_op = tf.variables_initializer(theta)
+        self.sess.run(init_new_vars_op)
+
+    def _build_network(self):
+        with tf.variable_scope(self.scope):
+            self.state_input = tf.placeholder(tf.float32, [None, self.state_size])
+            self.reward_target = tf.placeholder(tf.float32, [None])
+            fc1 = tf_utils.fc(self.state_input, self.n_h1, scope="fc1",
+                    activation_fn=tf.nn.elu,
+                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
+            fc2 = tf_utils.fc(fc1, self.n_h2, scope="fc2",
+                    activation_fn=tf.nn.elu,
+                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
+            self.reward_pred = tf_utils.fc(fc2, 1, activation_fn=None)
+
+            self.loss = tf.nn.l2_loss(tf.subtract(self.reward_pred, self.reward_target))
+            self.optimizer = tf.train.AdamOptimizer(self.lr)
+            self.train_op = self.optimizer.minimize(self.loss, global_step=tf.train.get_global_step())
+            theta = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
+        return theta
+
+    
+    def learn(self, env):
+        trajectories = []
+        for i in range(1000):
+            state = env.reset()
+            for j in range(2000):
+                action = env.action_space.sample()
+                next_state, reward, done, info = env.step(action)
+                trajectories.append([state, action, next_state])
+                state = next_state
+                if done:
+                    break
+
+        random.shuffle(trajectories)
+        batch_size = 100
+        batch_end = 0
+        
+        for i in range(1000):
+            if batch_end + batch_size > len(trajectories):
+                batch_end = 0
+                random.shuffle(trajectories)
+            batch_trajectories = trajectories[batch_end:batch_end+batch_size]
+
+            batch_states = [traj[0] for traj in batch_trajectories]
+            #values = [self.qnet.get_q_value(traj[0]).reshape([-1]) for traj in batch_trajectories]
+            #q_values = [values[i][traj[1]] for i, traj in enumerate(batch_trajectories)]
+            q_values = [self.qnet.get_q_value(traj[0])[0, traj[1]] for traj in batch_trajectories]
+
+            next_max_q_values = [np.max(self.qnet.get_q_value(traj[2])) for traj in batch_trajectories]
+
+            q_values = np.asarray(q_values)
+            next_max_q_values = np.asarray(next_max_q_values)
+            reward_targets = q_values - self.gamma * next_max_q_values
+            l, _ = sess.run([self.loss, self.train_op], feed_dict={self.state_input:batch_states,
+                                                            self.reward_target:reward_targets})
+            
+            if i % 10 == 0:
+                print("i : {}, {}".format(i, l))
+                """
+                if i > 100:
+                    gaps = []
+                    gap_iter = 0
+                    reward = None
+                    reward_before = None
+                    reward_pred_before = None
+                    reward_pred = None
+                    for i in range(1):
+                        state = env.reset()
+                        for j in range(2000):
+                            gap_iter += 1
+                            action = env.action_space.sample()
+                            reward_before = reward
+                            next_state, reward, done, info = env.step(action)
+                            reward_pred_before = reward_pred
+                            reward_pred = sess.run(self.reward_pred, feed_dict={self.state_input:[state]})
+                            gaps.append(reward_pred[0][0] - reward)
+                            if done:
+                                print(j)
+                                print("now ", reward_pred[0][0])
+                                print("before ", reward_pred_before[0][0])
+                                print("reward true ", reward)
+                                print("reward true_before ", reward_before)
+                                break
+                    gap = sum(gaps) / gap_iter
+                    print("gap : {}\n".format(gap))
+                """
+        # for end
+        ipdb.set_trace()
+
+
+    def get_reward(self, state):
+        reward = self.sess.run(self.reward_pred, feed_dict={self.state_input:[state]})
+        return reward[0][0]
+
+
+class DQN:
+    def __init__(self,
+            session,
+            epsilon=0.5,
+            epsilon_anneal=0.01,
+            end_epsilon=0.1,
+            lr=0.005,
+            gamma=0.9,
+            state_size=4,
+            action_size=2,
+            n_h1=20,
+            n_h2=20,
+            scope="dqn"
+            ):
+        self.sess = session
+        self.epsilon = epsilon
+        self.epsilon_anneal = epsilon_anneal
+        self.end_epsilon = end_epsilon
+        self.lr = lr
+        self.gamma = gamma
+        self.state_size = state_size
+        self.action_size = action_size
+        self.n_h1 = n_h1
+        self.n_h2 = n_h2
+        self.scope = scope
+        theta = self._build_network()
+        init_new_vars_op = tf.variables_initializer(theta)
+        self.sess.run(init_new_vars_op)
+
+    def _build_network(self):
+        with tf.variable_scope(self.scope):
+            self.state_input = tf.placeholder(tf.float32, [None, self.state_size])
+            self.action = tf.placeholder(tf.int32, [None])
+            self.target_q = tf.placeholder(tf.float32, [None])
+            fc1 = tf_utils.fc(self.state_input, self.n_h1, scope="fc1",
+                    activation_fn=tf.nn.elu,
+                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
+            fc2 = tf_utils.fc(fc1, self.n_h2, scope="fc2",
+                    activation_fn=tf.nn.elu,
+                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
+            self.q_values = tf_utils.fc(fc2, self.action_size, activation_fn=None)
+
+            action_mask = tf.one_hot(self.action, self.action_size, 1.0, 0.0)
+            q_value_pred = tf.reduce_sum(self.q_values * action_mask, 1)
+
+            self.loss = tf.reduce_mean(tf.square(tf.subtract(self.target_q, q_value_pred)))
+            self.optimizer = tf.train.AdamOptimizer(self.lr)
+            self.train_op = self.optimizer.minimize(self.loss, global_step=tf.train.get_global_step())
+            theta = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
+        return theta
+
+    def learn(self):
 
 
 
@@ -249,7 +491,6 @@ class DEEPIRL:
             with open(best_policy_bin_name, 'wb') as f:
                 pickle.dump([Best_agents, t_collection], f)
 
-        ipdb.set_trace()
         
         return
 
@@ -260,19 +501,29 @@ if __name__ == '__main__':
     with open(traj_name, 'rb') as rf:
         expert_trajectories = pickle.load(rf) #[[state, action, reward, next_state, done], ...]
 
-    #best_agent = get_best_agent('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True)
-    state_dim = 4
-    num_basis = 10
-    feature_means_name = "reward_basis_statedim{}_numbasis{}_pickle.bin".format(state_dim,
-                                                                                num_basis)
-    with open(feature_means_name, 'rb') as rf:
-        feature_means = pickle.load(rf)
-
+    sess = tf.Session()
+    dan = DeepActionNetwork(sess)
+    dan.learn(expert_trajectories)
+    """
     env = gym.make("CartPole-v0")
-    gamma = 0.99
-    reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
-    epsilon = 0.1
+    while True:
+        cur_state = env.reset()
+        done = False
+        t = 0
+        while not done:
+            env.render()
+            t = t+1
+            action = dan.get_optimal_action(cur_state)
+            print(action)
+            next_state, reward, done, info = env.step(action)
+            cur_state = next_state
+            if done:
+                print("{} timesteps".format(t+1))
+                break
+    """
+    drn = DeepRewardNetwork(sess, dan)
+    env = gym.make("CartPole-v0")
 
-    irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon) 
-    irl.loop()
-    ipdb.set_trace()
+    drn.learn(env)
+
+

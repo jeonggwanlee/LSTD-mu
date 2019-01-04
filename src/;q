@@ -22,8 +22,6 @@ env = gym.make('CartPole-v0')
 for iter, best_agent in enumerate(best_policy):
     #if iter != 9:
     #    continue
-    if iter < 45:
-        continue
     total_rewards = []
     for i in range(NUM_EVALUATION):
         env.seed()

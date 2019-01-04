@@ -31,7 +31,7 @@ class IRL:
         self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
 
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
-        initial_trajectories = _generate_trajectories_from_initial_policy(self)
+        initial_trajectories = self._generate_trajectories_from_initial_policy()
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
         self.mu_bar = self.mu_initial
 

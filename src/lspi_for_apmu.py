@@ -43,7 +43,7 @@ class LSPI_APMU:
         num_basis = self.basis_function._num_basis()
         actions = list(range(num_actions))
         self.policy = Policy(self.basis_function, num_basis, actions)
-        self.lstdq = LSTDQ(self.basis_function, gamma, self.policy)
+        self.lstdq = LSTD_MU(self.basis_function, gamma, self.policy)
         self.stop_criterion = 10**-5
         self.gamma = gamma
 
@@ -72,7 +72,7 @@ class LSPI_APMU:
         return error, new_weights
 
 
-class LSTDQ:
+class LSTD_MU:
     def __init__(self, basis_function, gamma, init_policy):
         self.basis_function = basis_function
         self.gamma = gamma

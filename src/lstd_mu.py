@@ -1,6 +1,6 @@
 import numpy as np
 from rbf import Basis_Function
-from policy import Policy
+from policy_for_ap import Policy
 import ipdb
 
 """
@@ -17,7 +17,7 @@ This focuses attention more clearly on the issue of exploration
 since any policy can be followed while collecting samples.
 """
 
-class LSPI:
+class LSPI_APMU:
     """ Learns a policy from samples
         D : source of samples (s, a, r, s`)
         k : number of basis functions
@@ -26,7 +26,6 @@ class LSPI:
         epsilon : stopping criterion
         policy(pi) : initial policy
     """
-    #def __init__(self, num_actions=3, num_means=2, gamma=0.99):
     def __init__(self, num_actions=3, state_dim=2, gamma=0.99):
         """
         num_actions. Number of actions. Int.
@@ -34,9 +33,9 @@ class LSPI:
         gamma. Float.
         """
         
-        print ("LSPI init!")
-        print ("num_actions : %d, state_dim(dim_of_states) : %d" %
-                (num_actions, state_dim))
+        #print ("LSPI init!")
+        #print ("num_actions : %d, state_dim(dim_of_states) : %d" %
+        #        (num_actions, state_dim))
 
         num_features = state_dim + 1 # for convenience 
         self.basis_function = Basis_Function(state_dim, num_features, num_actions, gamma)
@@ -44,7 +43,7 @@ class LSPI:
         num_basis = self.basis_function._num_basis()
         actions = list(range(num_actions))
         self.policy = Policy(self.basis_function, num_basis, actions)
-        self.lstdq = LSTDQ(self.basis_function, gamma, self.policy)
+        self.lstdq = LSTD_MU(self.basis_function, gamma, self.policy)
         self.stop_criterion = 10**-5
         self.gamma = gamma
 
@@ -55,43 +54,32 @@ class LSPI:
         action = self.policy.actions[index[0]]
         return action
 
-    def train(self, sample, total_iteration, w_important_Sampling=False):
+#    def train(self, sample, total_iteration, w_important_sampling=False):
+    def train_and_get_mu(self, sample, w_important_sampling=False):
         
         error = float('inf')
         num_iteration = 0
         epsilon = 0.001
 
-        if w_important_Sampling:
+        if w_important_sampling:
             new_weights = self.lstdq.train_weight_parameter(sample, self.policy)
         else:
             new_weights = self.lstdq.train_parameter(sample, self.policy)
 
         error = np.linalg.norm((new_weights - self.policy.weights))
-        #print("weight shift norm : ", error)
         self.policy.update_weights(new_weights)
 
-        #while (epsilon * (1 - self.gamma) / self.gamma) < error and num_iteration < total_iteration:
-        #    if w_important_Sampling:
-        #        new_weights = self.lstdq.train_weight_parameter(sample, self.policy)
-        #    else:
-        #        new_weights = self.lstdq.train_parameter(sample, self.policy)
-
-        #    error = np.linalg.norm((new_weights - self.policy.weights))
-        #    print("weight shift norm : ", error)
-        #    self.policy.update_weights(new_weights)
-        #    num_iteration += 1
-
-        return error
+        return error, new_weights
 
 
-class LSTDQ:
+class LSTD_MU:
     def __init__(self, basis_function, gamma, init_policy):
         self.basis_function = basis_function
         self.gamma = gamma
         self.policy = init_policy
         self.greedy = [] # for train weight parameter
 
-    def train_parameter(self, sample, policy):
+    def train_parameter(self, sample, policy, reward_basis):
         """ Compute Q value function of current policy
             to obtain the greedy policy
             -> theta
@@ -99,43 +87,45 @@ class LSTDQ:
     
         self.policy = policy
         k = self.basis_function._num_basis()
+        q = reward_basis._num_basis()
 
         A = np.zeros([k, k])
-        b = np.zeros([k, 1])
+        # b = np.zeros([k, 1])
+        b = np.zeros([k, q])
         np.fill_diagonal(A, .1)
 
         states      = sample[0]
         actions     = sample[1]
-        rewards     = sample[2]
+        #rewards     = sample[2]
         next_states = sample[3]
+        phi_stack   = reward_basis.evaluate_multi_states(states)
 
         SAMPLE_SIZE = len(states)
         for i in range(SAMPLE_SIZE):
             # take action from the greedy target policy
             action = self.policy.get_best_action(next_states[i])
 
-            phi =      self.basis_function.evaluate(states[i], actions[i])
-            phi_next = self.basis_function.evaluate(next_states[i], action)
+            psi =      self.basis_function.evaluate(states[i], actions[i])
+            psi_next = self.basis_function.evaluate(next_states[i], action)
             
-            loss = (phi - self.gamma * phi_next)
-            phi  = np.resize(phi, [k, 1])
-            loss = np.resize(phi, [1, len(loss)])
+            loss = (psi - self.gamma * psi_next)
+            psi = np.resize(psi, [k, 1])
+            loss = np.resize(psi, [1, len(loss)])
 
-            A = A + np.dot(phi, loss)
-            ipdb.set_trace()
-            b = b + (phi * rewards[i])
+            A = A + np.dot(psi, loss)
+            b = b + (psi.reshape((-1, 1)) * phi_stack[i].reshape((1, -1)))
         #end for i in range(len(states)):
 
         inv_A = np.linalg.inv(A)
         theta = np.dot(inv_A, b)
+        assert theta.shape == (k, q)
 
         return theta
 
-    def train_weight_parameter(self, sample, policy):
+    def train_weight_parameter(self, sample, policy, reward_basis):
         """ Compute Q value function of current policy
             to obtain the greedy policy
         """
-
         k = self.basis_function._num_basis()
         A = np.zeros([k, k])
         b = np.zeros([k, 1])
@@ -145,7 +135,9 @@ class LSTDQ:
         actions     = sample[1]
         rewards     = sample[2]
         next_states = sample[3]
-        
+        phi_stack   = reward_basis.evaluate_multi_states(states)
+        ipdb.set_trace()
+
         SAMPLE_SIZE = len(states)
         self.greedy = np.zeros_like(actions)
         self.greedy = np.reshape(self.greedy, [1, len(actions)])
@@ -189,7 +181,8 @@ class LSTDQ:
 
         inv_A = np.linalg.inv(A)
         theta = np.dot(inv_A, b)
-
+        
+        assert theta.shape == (k, 1)
         return theta
 
 

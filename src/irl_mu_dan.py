@@ -5,13 +5,12 @@ import numpy as np
 import copy
 import os
 import datetime
+import tensorflow as tf
 
-from reward_basis import RewardBasis, Theta
 from record import get_test_record_title
 from replay_memory import Memory
-from lspi import LSPI
 from lspi_for_apmu import LSPI_APMU
-from lstd_mu import LSTD_MU
+from deep_action_network import DeepActionNetwork
 
 TRANSITION = 15000
 EPISODE = 20
@@ -19,10 +18,10 @@ BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
 
-class IRL:
-    def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon):
+class IRL_MU_DAN:
+    def __init__(self, env, dan, expert_trajectories, gamma, epsilon):
         self.env = env
-        self.reward_basis = reward_basis
+        self.dan = dan
         self.expert_trajectories = expert_trajectories
         self.gamma = gamma
         self.epsilon = epsilon
@@ -86,7 +85,8 @@ class IRL:
             gamma_update = 1.0 / self.gamma
             for j, sample in enumerate(one_traj): # [s, a, r, s', d]
                 state = sample[0]
-                phi_state = self.reward_basis.evaluate(state)
+                phi_state = self.dan.get_features(state)
+                #phi_state = self.reward_basis.evaluate(state)
                 gamma_update *= self.gamma
                 phi_time_unit = phi_state * gamma_update
                 if j == 0: 
@@ -102,15 +102,16 @@ class IRL:
         mu = mu_sum / len(trajectories)
         return mu
 
-    def _test_policy_with_approxi_reward(self, agent, reward_basis, theta, isRender=False):
+    def _test_policy_with_approxi_reward(self, agent, dan, theta, isRender=False):
         total_reward = 0.0
         self.env.seed()
         state = self.env.reset()
         for _ in range(TRANSITION):
             if isRender:
                 self.env.render()
-            phi = reward_basis.evaluate(state)
-            approxi_reward = np.dot(phi, theta)
+            phi = self.dan.get_features(state)
+            #phi = reward_basis.evaluate(state)
+            approxi_reward = np.dot(phi, theta.T).min()  # trick
             action = agent.act(state)
             next_state, _, done, _ = self.env.step(action)
             state = next_state
@@ -134,8 +135,9 @@ class IRL:
                     self.env.render()
                 action = self.env.action_space.sample()
                 next_state, _, done, _ = self.env.step(action)
-                phi_state = self.reward_basis.evaluate(state) # (10, )
-                reward = np.dot(phi_state, theta)
+                phi_state = self.dan.get_features(state)
+                #phi_state = self.reward_basis.evaluate(state)
+                reward = np.dot(phi_state, theta.T).min()
                 memory.add([state, action, reward, next_state, done])
                 state = next_state
                 if done:
@@ -146,11 +148,11 @@ class IRL:
             else:
                 sample = memory.select_sample(BATCH_SIZE)
             
-            error = agent.train(sample, None, w_important_Sampling=True)
+            error, new_weights = agent.train_and_get_mu(sample, w_important_sampling=True)
 
             reward_list = []
             for j in range(NUM_EVALUATION):
-                total_reward = self._test_policy_with_approxi_reward(agent, self.reward_basis,
+                total_reward = self._test_policy_with_approxi_reward(agent, self.dan,
                                                                       theta)
                 reward_list.append(total_reward)
             mean_reward = sum(reward_list) / NUM_EVALUATION
@@ -185,66 +187,39 @@ class IRL:
         iteration = 0
         Best_agents = []
         t_collection = []
-        best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_mu_pickle.bin"
+        best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_mu_dan_pickle.bin"
         # R = pi w
         # 3.
         while t > self.epsilon:
             # 4.
-            # agent = LSPI_APMU(self.num_actions, self.state_dim)
-            agent = LSPI(self.num_actions, self.state_dim)
+            agent = LSPI_APMU(self.num_actions, self.state_dim)
             best_agent = self._get_best_agent(self.memory, agent, 
                                               self.theta, isRender=False)
 
             xi = np.reshape(best_agent.policy.weights, [-1])
             Best_agents.append(best_agent)
             bf = best_agent.basis_function
-           
-            self.memory.clear_memory()
-
             #start = datetime.datetime.now()
-
-            # sampling
-            for i in range(1000):
-                state = self.env.reset()
-                for j in range(300):
-                    action = best_agent.act(state)
-                    next_state, _, done, _ = self.env.step(action)
-                    self.memory.add([state, action, None, next_state, done])
-                    if done:
-                        break
-            # collect sample done
-            # mu_basis = Basis_function(self.state_dim, self.state_dim + 1, self.num_actions, self.gamma)
-            # num_basis = mu_basis._num_basis()
-            #mu_policy = Policy(mu_basis, num_basis, list(range(num_actions)))
-            mu_basis = best_agent.basis_function
-            mu_policy = best_agent.policy
-
-            lstd_mu = LSTD_MU(mu_basis, self.gamma, mu_policy)
-
-            samples = self.memory.select_sample(self.memory.container_size)
-            self.memory.clear_memory()
-            xi = lstd_mu.train_parameter(samples, mu_policy, self.reward_basis)
-            #start = datetime.datetime.now()
-            psi_sum = np.zeros((10,))
+            psi_sum = np.zeros((1, 10))
             for i in range(1000):
                 psi = bf.evaluate(self.env.reset(), self.env.action_space.sample())
+                psi = psi.reshape((1, 10))
                 psi_sum += psi
             psi = psi_sum / 1000
-            mu_origin = np.dot(xi.T, psi.reshape((-1, 1))).reshape([-1])
-
-            #first_end = datetime.datetime.now()
-            #first_end_result = first_end - start
+            mu_origin = psi * xi
+            ##first_end = datetime.datetime.now()
+            ##first_end_result = first_end - start
             #new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
             #mu = self.compute_feature_expectation(new_trajectories)
-            #second_end = datetime.datetime.now()
-            #second_end_result = second_end - first_end
-            #ipdb.set_trace()
+            ##second_end = datetime.datetime.now()
+            ##second_end_result = second_end - first_end
+            ##ipdb.set_trace()
 
             #print("gap : ", np.linalg.norm(mu_origin - mu))
 
             #updated_loss = mu - self.mu_bar
             updated_loss = mu_origin - self.mu_bar
-            self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
+            self.mu_bar += updated_loss * updated_loss.dot(self.theta.T) / np.square(updated_loss).sum()
             self.theta = self.mu_expert - self.mu_bar
             t = np.linalg.norm(self.theta, 2)
             t_collection.append(t)
@@ -272,18 +247,21 @@ if __name__ == '__main__':
 
     #best_agent = get_best_agent('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True)
     state_dim = 4
-    num_basis = 9
-    feature_means_name = "reward_basis_statedim{}_numbasis{}_pickle.bin".format(state_dim, num_basis)
-    feature_means = None
-    if os.path.exists(feature_means_name):
-        with open(feature_means_name, 'rb') as rf:
-            feature_means = pickle.load(rf)
+    num_basis = 10
+    feature_means_name = "reward_basis_statedim{}_numbasis{}_pickle.bin".format(state_dim,
+                                                                                num_basis)
+    with open(feature_means_name, 'rb') as rf:
+        feature_means = pickle.load(rf)
 
     env = gym.make("CartPole-v0")
+    sess = tf.Session()
+    dan = DeepActionNetwork(sess, n_h1=20, n_h2=10)
+    dan.learn(expert_trajectories)
+
     gamma = 0.99
-    reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
+    # reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
     epsilon = 0.1
 
-    irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon) 
+    irl = IRL_MU_DAN(env, dan, expert_trajectories, gamma, epsilon)
     irl.loop()
     ipdb.set_trace()

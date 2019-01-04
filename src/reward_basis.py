@@ -65,6 +65,20 @@ class RewardBasis:
 
         return phi
 
+    def evaluate_multi_states(self, states):
+
+        phi_stack = None
+        num_states = states.shape[0]
+        for i in range(num_states):
+            phi = self.evaluate(states[i])
+            if i == 0:
+                phi_stack = phi
+            else:
+                phi_stack = np.vstack((phi_stack, phi))
+
+        return phi_stack
+            
+
 if __name__ == "__main__":
    
     exp_name = get_test_record_title("CartPole-v0", 1000, 'initial2', num_tests=1, important_sampling=True)

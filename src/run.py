@@ -298,7 +298,7 @@ def _reuse_sample(env, memory, agent, game_name, isRender=False):
             if i < 50:
                 action = env.action_space.sample()
             else:
-                action = agent._act(state)
+                action = agent.act(state)
             next_state, reward, done, info = env.step(action)
             memory.add([state, action, reward, next_state, done])
             state = next_state

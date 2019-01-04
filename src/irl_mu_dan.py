@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from record import get_test_record_title
 from replay_memory import Memory
-from lspi_for_apmu import LSPI_APMU
+from lspi import LSPI
 from deep_action_network import DeepActionNetwork
 
 TRANSITION = 15000
@@ -192,7 +192,7 @@ class IRL_MU_DAN:
         # 3.
         while t > self.epsilon:
             # 4.
-            agent = LSPI_APMU(self.num_actions, self.state_dim)
+            agent = LSPI(self.num_actions, self.state_dim)
             best_agent = self._get_best_agent(self.memory, agent, 
                                               self.theta, isRender=False)
 

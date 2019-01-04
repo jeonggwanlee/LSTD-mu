@@ -19,7 +19,7 @@ def sample_trajectories_from_expert(game_name, episode, trainopt, num_tests=1, i
         trajectory = []
         for j in range(TRANSITION):
             
-            action = best_agent._act(state)
+            action = best_agent.act(state)
             next_state, reward, done, info = env.step(action)
             trajectory.append([state, action, reward, next_state, done])
             state = next_state

@@ -25,7 +25,7 @@ def test_policy(env, agent, isRender=False):
     for i in range(5000):
         if isRender:
             env.render()
-        action = agent._act(state)
+        action = agent.act(state)
         next_state, reward, done, info = env.step(action)
         state = next_state
 

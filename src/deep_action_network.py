@@ -38,7 +38,7 @@ class DeepActionNetwork:
                  state_size=4,
                  action_size=2,
                  n_h1=20,
-                 n_h2=20,
+                 n_h2=9,
                  scope="deep_action"
                 ):
         self.sess = session
@@ -65,6 +65,7 @@ class DeepActionNetwork:
                                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
             self.fc2_softmax = tf.nn.softmax(self.fc2, name="fc2_softmax")
             self.q_value = tf_utils.fc(self.fc2, self.action_size, activation_fn=None)
+
             self.action_pred = tf.nn.softmax(self.q_value, name="action")
             self.action_target = tf.one_hot(self.action, self.action_size, on_value=1.0, off_value=0.0)
             self.loss = tf.reduce_mean(tf.square(tf.subtract(self.action_pred, self.action_target)))

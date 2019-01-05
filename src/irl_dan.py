@@ -14,7 +14,7 @@ from deep_action_network import DeepActionNetwork
 from irl_test import IRL_test
 
 TRANSITION = 15000
-EPISODE = 100
+EPISODE = 30
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
@@ -32,7 +32,7 @@ class IRL_DAN:
         self.num_actions = self.env.action_space.n
         self.state_dim = self.env.observation_space.shape[0]
         action_dim = 1
-        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
+        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, self.state_dim)
 
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
         initial_trajectories = self._generate_trajectories_from_initial_policy()
@@ -176,6 +176,16 @@ class IRL_DAN:
 
     def loop(self):
 
+        pre_soft = self.dan.pre_soft
+        dan_output = self.dan._num_basis()
+        best_policy_bin_name = "CartPole-v0_DAN{}_PreSoft{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_dan_pickle.bin".format(dan_output, pre_soft, important_sampling, EPISODE)
+ 
+        print("#Experiment name : ", best_policy_bin_name)
+        iteration = 0
+        Best_agents = []
+        t_collection = []
+        test_reward_collection = []
+
         # 1.
         initial_trajectories = self._generate_trajectories_from_initial_policy()
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
@@ -185,12 +195,7 @@ class IRL_DAN:
         self.theta = self.mu_expert - self.mu_bar # theta
         t = np.linalg.norm(self.theta, 2)
         print("Initial threshold: ", t)
-        iteration = 0
-        Best_agents = []
-        t_collection = []
-        #p = self.reward_basis._num_basis()
-        pre_soft = self.dan.pre_soft
-        best_policy_bin_name = "CartPole-v0_DAN20_PreSoft{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_dan_pickle.bin".format(pre_soft, important_sampling, EPISODE)
+
         # 3.
         while t > self.epsilon:
             print("iteration: ", iteration)
@@ -203,8 +208,10 @@ class IRL_DAN:
             Best_agents.append(best_agent)
             
             # Best agent testing
-            IRL_test(self.env, best_agent, iteration)
+            test_reward = IRL_test(self.env, best_agent, iteration)
+            test_reward_collection.append(test_reward)
 
+            # 2. Projection method
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
             mu = self.compute_feature_expectation(new_trajectories)
             updated_loss = mu - self.mu_bar
@@ -220,9 +227,10 @@ class IRL_DAN:
             if os.path.exists(best_policy_bin_name):
                 os.remove(best_policy_bin_name)
             with open(best_policy_bin_name, 'wb') as f:
-                pickle.dump([Best_agents, t_collection], f)
+                pickle.dump([Best_agents, t_collection, test_reward_collection], f)
 
-        ipdb.set_trace()
+            if iteration == 200:
+                break
         
         return
 
@@ -243,4 +251,3 @@ if __name__ == '__main__':
 
     irl = IRL_DAN(env, dan, expert_trajectories, gamma, epsilon)
     irl.loop()
-    ipdb.set_trace()

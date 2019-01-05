@@ -14,7 +14,7 @@ from lspi import LSPI
 from irl_test import IRL_test
 
 TRANSITION = 15000
-EPISODE = 500
+EPISODE = 30
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
@@ -176,9 +176,13 @@ class IRL:
 
         p = self.reward_basis._num_basis()
         best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_pickle.bin".format(p, important_sampling, EPISODE)
+
+        print("#Experiment name : ", best_policy_bin_name)
+
         iteration = 0
         Best_agents = []
         t_collection = []
+        test_reward_collection = []
 
         # 1.
         initial_trajectories = self._generate_trajectories_from_initial_policy()
@@ -203,7 +207,8 @@ class IRL:
             Best_agents.append(best_agent)
 
             # Best agent testing
-            IRL_test(self.env, best_agent, iteration)
+            test_reward = IRL_test(self.env, best_agent, iteration)
+            test_reward_collection.append(test_reward)
 
             # 2. Projection method
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
@@ -221,9 +226,11 @@ class IRL:
             if os.path.exists(best_policy_bin_name):
                 os.remove(best_policy_bin_name)
             with open(best_policy_bin_name, 'wb') as f:
-                pickle.dump([Best_agents, t_collection], f)
+                pickle.dump([Best_agents, t_collection, test_reward_collection], f)
 
-        ipdb.set_trace()
+            if iteration == 200:
+                break
+
         return
 
 
@@ -246,4 +253,3 @@ if __name__ == '__main__':
 
     irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon)
     irl.loop()
-    ipdb.set_trace()

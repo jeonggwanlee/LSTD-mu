@@ -15,7 +15,7 @@ from deep_action_network import DeepActionNetwork
 from irl_test import IRL_test
 
 TRANSITION = 15000
-EPISODE = 100
+EPISODE = 30
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
@@ -178,11 +178,16 @@ class IRL_LSTDMU_DAN:
 
 
     def loop(self):
+
         pre_soft = self.dan.pre_soft
-        best_policy_bin_name = "DEBUG_CartPole-v0_DAN20_PreSoft{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_lstdmu_pickle.bin".format(pre_soft, important_sampling, EPISODE)
+        dan_output = self.dan._num_basis()
+        best_policy_bin_name = "CartPole-v0_DAN{}_PreSoft{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_lstdmu_pickle.bin".format(dan_output, pre_soft, important_sampling, EPISODE)
+        print("#Experiment name : ", best_policy_bin_name)
+
         iteration = 0
         Best_agents = []
         t_collection = []
+        test_reward_collection = []
 
         # 1.
         initial_trajectories = self._generate_trajectories_from_initial_policy()
@@ -208,14 +213,14 @@ class IRL_LSTDMU_DAN:
                                               self.theta,
                                               isRender=False)
 
-
             self.memory.clear_memory()
             Best_agents.append(best_agent)
-           
-            IRL_test(self.env, best_agent, iteration)
+
+            test_reward = IRL_test(self.env, best_agent, iteration)
+            test_reward_collection.append(test_reward)
 
             # Time checker 1
-            start = datetime.datetime.now()
+            # start = datetime.datetime.now()
 
             # Get psi(s0)
             _psi_sum = np.zeros((q,))
@@ -250,18 +255,17 @@ class IRL_LSTDMU_DAN:
             mu_origin = np.reshape(mu_origin, [-1])
             
             # Time checker 2
-            first_end = datetime.datetime.now()
-            first_end_result = first_end - start
+            # first_end = datetime.datetime.now()
+            # first_end_result = first_end - start
 
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
             mu = self.compute_feature_expectation(new_trajectories)
             
             # Time checker 3
-            second_end = datetime.datetime.now()
-            second_end_result = second_end - first_end
-            print(first_end_result)
-            print(second_end_result)
-
+            # second_end = datetime.datetime.now()
+            # second_end_result = second_end - first_end
+            # print(first_end_result)
+            # print(second_end_result)
 
             #updated_loss = mu - self.mu_bar
 
@@ -278,11 +282,11 @@ class IRL_LSTDMU_DAN:
             if os.path.exists(best_policy_bin_name):
                 os.remove(best_policy_bin_name)
             with open(best_policy_bin_name, 'wb') as f:
-                pickle.dump([Best_agents, t_collection], f)
+                pickle.dump([Best_agents, t_collection, test_reward_collection], f)
 
-            
+            if iteration == 200:
+                break
         # end while
-        ipdb.set_trace()
         
         return
 
@@ -303,4 +307,3 @@ if __name__ == '__main__':
 
     irl = IRL_LSTDMU_DAN(env, dan, expert_trajectories, gamma, epsilon)
     irl.loop()
-    ipdb.set_trace()

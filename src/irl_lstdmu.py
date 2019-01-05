@@ -14,7 +14,7 @@ from lstd_mu import LSTD_MU
 from irl_test import IRL_test
 
 TRANSITION = 15000
-EPISODE = 100
+EPISODE = 30
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
@@ -176,7 +176,18 @@ class IRL_LSTDMU:
 
 
     def loop(self):
-        # 1.
+
+        p = self.reward_basis._num_basis()
+        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_lstdmu_pickle.bin".format(p, important_sampling, EPISODE)
+
+        print("#Experiment name : ", best_policy_bin_name)
+        iteration = 0
+        Best_agents = []
+        t_collection = []
+        test_reward_collection = []
+        time_checker_collection = []
+
+       # 1.
         initial_trajectories = self._generate_trajectories_from_initial_policy()
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
 
@@ -185,17 +196,12 @@ class IRL_LSTDMU:
         self.theta = self.mu_expert - self.mu_bar  # theta
         t = np.linalg.norm(self.theta, 2)
         print("Initial threshold: ", t)
-        iteration = 0
-        Best_agents = []
-        t_collection = []
-        p = self.reward_basis._num_basis()
-        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_lstdmu_pickle.bin".format(p, important_sampling, EPISODE)
-        # 3.
 
         agent = LSPI(self.num_actions, self.state_dim)
         psi_function = agent.basis_function
         q = psi_function._num_basis()
 
+        # 3.
         while t > self.epsilon:
             print("iteration: ", iteration)
             # 4.
@@ -209,7 +215,8 @@ class IRL_LSTDMU:
             self.memory.clear_memory()
             Best_agents.append(best_agent)
            
-            IRL_test(self.env, best_agent, iteration)
+            test_reward = IRL_test(self.env, best_agent, iteration)
+            test_reward_collection.append(test_reward)
 
             # Time checker 1
             start = datetime.datetime.now()
@@ -256,12 +263,11 @@ class IRL_LSTDMU:
             # Time checker 3
             second_end = datetime.datetime.now()
             second_end_result = second_end - first_end
-            print(first_end_result)
-            print(second_end_result)
-
+            # print(first_end_result)
+            # print(second_end_result)
+            time_checker_collection.append([first_end_result, second_end_result])
 
             #updated_loss = mu - self.mu_bar
-
             updated_loss = mu_origin - self.mu_bar
             self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
             self.theta = self.mu_expert - self.mu_bar
@@ -275,11 +281,12 @@ class IRL_LSTDMU:
             if os.path.exists(best_policy_bin_name):
                 os.remove(best_policy_bin_name)
             with open(best_policy_bin_name, 'wb') as f:
-                pickle.dump([Best_agents, t_collection], f)
+                pickle.dump([Best_agents, t_collection, test_reward_collection, time_checker_collection], f)
 
-            
+            if iteration == 200:
+                break
+
         # end while
-        ipdb.set_trace()
         
         return
 
@@ -305,4 +312,3 @@ if __name__ == '__main__':
 
     irl = IRL_LSTDMU(env, reward_basis, expert_trajectories, gamma, epsilon)
     irl.loop()
-    ipdb.set_trace()

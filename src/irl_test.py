@@ -41,6 +41,7 @@ def IRL_test(env, best_agent, iter, isRender=False):
     reward = sum(total_rewards) / NUM_EVALUATION
     print("{}'s agent {} ".format(iter, reward))
 
+    return reward
 
 if __name__ == '__main__':
 #best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_pickle.bin"

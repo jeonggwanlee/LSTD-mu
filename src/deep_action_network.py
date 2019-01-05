@@ -33,6 +33,7 @@ class DeepActionNetwork:
     """
     def __init__(self,
                  session,
+                 pre_soft=True,
                  learning_rate=0.05,
                  state_size=4,
                  action_size=2,
@@ -41,6 +42,7 @@ class DeepActionNetwork:
                  scope="deep_action"
                 ):
         self.sess = session
+        self.pre_soft = pre_soft
         self.learning_rate = learning_rate
         self.state_size = state_size
         self.action_size = action_size
@@ -71,6 +73,9 @@ class DeepActionNetwork:
             new_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
         return new_variables
 
+    def _num_basis(self):
+        return self.n_h2
+
     def learn(self, expert_trajectories):
         """ training from expert_trajectories """
         expert_trajs_flat = []
@@ -91,7 +96,7 @@ class DeepActionNetwork:
                                                                            self.action:cur_action_batch})
             batch_end += BATCH_SIZE
             if i % 10 == 0:
-                print("i {}, {}".format(i, loss))
+                print("Deep Action Network Training iteration {}, {}".format(i, loss))
 
     def get_optimal_action(self, state):
         actions = self.sess.run(self.action_pred, feed_dict={self.state_input: [state]})
@@ -102,5 +107,38 @@ class DeepActionNetwork:
         return q_value
 
     def get_features(self, state):
-        fc2 = self.sess.run(self.fc2_softmax, feed_dict={self.state_input: [state]})
+        if self.pre_soft:
+            fc2 = self.sess.run(self.fc2, feed_dict={self.state_input: [state]})
+        else:
+            fc2 = self.sess.run(self.fc2_softmax, feed_dict={self.state_input: [state]})
         return fc2
+
+    def evaluate_multi_states(self, state):
+        """ get features's multiple version
+        """
+        if self.pre_soft:
+            fc2 = self.sess.run(self.fc2, feed_dict={self.state_input: state})
+        else:
+            fc2 = self.sess.run(self.fc2_softmax, feed_dict={self.state_input: state})
+        return fc2
+
+    def test(self, env, isRender=True):
+        NUM_TEST = 5
+        print("Testing Deep Action Network... {} times".format(NUM_TEST))
+        for i in range(NUM_TEST):
+            cur_state = env.reset()
+            done = False
+            t = 0
+            while not done:
+                t = t + 1
+                if isRender:
+                    env.render()
+                action = self.get_optimal_action(cur_state)
+                next_state, reward, done, _ = env.step(action)
+                cur_state = next_state
+                if done:
+                    print("Test DAN {} : {} timesteps".format(i, t))
+                    break
+            #end while
+        #end for i
+                

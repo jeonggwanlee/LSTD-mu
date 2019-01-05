@@ -7,19 +7,6 @@ import ipdb
 from test import get_best_agent
 from record import get_test_record_title
 
-class RewardHyperSpace:
-    def __init__(self, theta, reward_basis):
-
-        self.theta = theta
-        self.reward_basis = reward_basis
-        assert theta.shape[1] == reward_basis.shape[0]
-        self.reward_function = np.dot(theta, reward_basis)
-
-class Theta:
-    def __init__(self, num_theta):
-        self.num_theta = num_theta
-        self.weights = np.random.uniform(-1.0, 1.0, size=(num_theta,))
-        
 
 class RewardBasis:
     def __init__(self, state_dim, num_basis, gamma=0.99, feature_means=None):
@@ -88,11 +75,9 @@ if __name__ == "__main__":
 
     #best_agent = get_best_agent('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True)
     state_dim = 4
-    num_basis = 10
-    feature_means_name = "reward_basis_statedim{}_numbasis{}_pickle.bin".format(state_dim,
-                                                                                num_basis)
+    num_basis = 9
+    feature_means_name = "CartPole-v0_RewardBasis{}_pickle.bin".format(num_basis)
     with open(feature_means_name, 'rb') as rf:
         feature_means = pickle.load(rf)
     reward_basis = RewardBasis(state_dim, num_basis, feature_means)
-    theta = Theta(4)
     ipdb.set_trace()

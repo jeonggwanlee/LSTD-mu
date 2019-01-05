@@ -1,5 +1,4 @@
 import numpy as np
-from rbf import Basis_Function
 import ipdb
 
 class Policy:
@@ -58,5 +57,8 @@ class Policy:
         return best_actions
 
     def get_best_action(self, state):
+        """ pi(s) = argmax_a Q(s, a)
+        
+        """
         indices = self.get_actions(state)
         return self.actions[indices[0]]

@@ -4,17 +4,21 @@ import gym
 import numpy as np
 import copy
 import os
+# import tensorflow as tf
 
-from reward_basis import RewardBasis, Theta
+from reward_basis import RewardBasis
 from record import get_test_record_title
 from replay_memory import Memory
-from lspi_for_ap import LSPI_AP
+from lspi import LSPI
+# from deep_action_network import DeepActionNetwork
+from irl_test import IRL_test
 
 TRANSITION = 15000
-EPISODE = 20
+EPISODE = 500
 BATCH_SIZE = 400
 MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
+important_sampling = True
 
 class IRL:
     def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon):
@@ -28,13 +32,12 @@ class IRL:
         self.num_actions = self.env.action_space.n
         self.state_dim = self.env.observation_space.shape[0]
         action_dim = 1
-        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
+        self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, self.state_dim)
 
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
         initial_trajectories = self._generate_trajectories_from_initial_policy()
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
         self.mu_bar = self.mu_initial
-
 
     def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
         trajectories = []
@@ -78,7 +81,6 @@ class IRL:
         # for _
         return trajectories
 
-
     def compute_feature_expectation(self, trajectories):
         mu_sum = None
         for i, one_traj in enumerate(trajectories):
@@ -90,12 +92,12 @@ class IRL:
                 phi_state = self.reward_basis.evaluate(state)
                 gamma_update *= self.gamma
                 phi_time_unit = phi_state * gamma_update
-                if j == 0: 
+                if j == 0:
                     one_mu = phi_time_unit
                 else: 
                     one_mu += phi_time_unit
             # for j
-            if i == 0: 
+            if i == 0:
                 mu_sum = one_mu
             else: 
                 mu_sum += one_mu
@@ -105,7 +107,6 @@ class IRL:
 
     def _test_policy_with_approxi_reward(self, agent, reward_basis, theta, isRender=False):
         total_reward = 0.0
-        self.env.seed()
         state = self.env.reset()
         for _ in range(TRANSITION):
             if isRender:
@@ -115,20 +116,18 @@ class IRL:
             action = agent.act(state)
             next_state, _, done, _ = self.env.step(action)
             state = next_state
-            total_reward += approxi_reward 
+            total_reward += approxi_reward
             if done:
                 break
 
         return total_reward
 
-
     def _get_best_agent(self, memory, agent, theta, isRender=False):
         Best_agent = None
-        Best_mean_reward = -4000
-        mean_reward = -4000
+        Best_mean_reward = float("-inf")
+        mean_reward = float("-inf")
         # 1000 * 100
         for i in range(EPISODE):
-            self.env.seed()
             state = self.env.reset()
             for j in range(TRANSITION):
                 if isRender:
@@ -147,23 +146,24 @@ class IRL:
             else:
                 sample = memory.select_sample(BATCH_SIZE)
             
-            agent.train(sample, w_important_sampling=True)
+            agent.train(sample, w_important_sampling=important_sampling)
             
             reward_list = []
             for j in range(NUM_EVALUATION):
-                total_reward = self._test_policy_with_approxi_reward(agent, self.reward_basis,
-                                                                      theta)
+                total_reward = self._test_policy_with_approxi_reward(agent,
+                                                                     self.reward_basis,
+                                                                     theta)
                 reward_list.append(total_reward)
             mean_reward = sum(reward_list) / NUM_EVALUATION
 
             if Best_mean_reward < mean_reward:
-                print("Get Best reward {}".format(mean_reward))
+                #print("Get Best reward {}".format(mean_reward))
                 Best_agent = copy.deepcopy(agent)
                 Best_mean_reward = mean_reward
                 memory.clear_memory()
             
             if i % 20 == 0:
-                print("i : {}/{}".format(i, EPISODE))
+                print("Find Best Agent iteration : {}/{}".format(i, EPISODE))
             
         # for i
         # Clean up
@@ -174,6 +174,12 @@ class IRL:
 
     def loop(self):
 
+        p = self.reward_basis._num_basis()
+        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_pickle.bin".format(p, important_sampling, EPISODE)
+        iteration = 0
+        Best_agents = []
+        t_collection = []
+
         # 1.
         initial_trajectories = self._generate_trajectories_from_initial_policy()
         self.mu_initial = self.compute_feature_expectation(initial_trajectories)
@@ -183,30 +189,33 @@ class IRL:
         self.theta = self.mu_expert - self.mu_bar # theta
         t = np.linalg.norm(self.theta, 2)
         print("Initial threshold: ", t)
-        iteration = 0
-        Best_agents = []
-        t_collection = []
-        best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_pickle.bin"
-        # R = pi w
+
         # 3.
         while t > self.epsilon:
+
+            print("iteration: ", iteration)
             # 4.
-            agent = LSPI_AP(self.num_actions, self.state_dim)
-            best_agent = self._get_best_agent(self.memory, agent, 
-                                              self.theta, isRender=False)
+            agent = LSPI(self.num_actions, self.state_dim)
+            best_agent = self._get_best_agent(self.memory,
+                                              agent,
+                                              self.theta,
+                                              isRender=False)
             Best_agents.append(best_agent)
 
+            # Best agent testing
+            IRL_test(self.env, best_agent, iteration)
+
+            # 2. Projection method
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
-            mu = self.compute_feature_expectation(new_trajectories)            
+            mu = self.compute_feature_expectation(new_trajectories)
             updated_loss = mu - self.mu_bar
             self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
             self.theta = self.mu_expert - self.mu_bar
             t = np.linalg.norm(self.theta, 2)
             t_collection.append(t)
-            print("iteration: ", iteration)
             print("threshold: ", t)
-            if iteration > 1:
-                print("threshold_gap: ", t_collection[-1] - t_collection[-2])
+            if iteration > 0:
+                print("threshold_gap: %05f" % (t_collection[-1] - t_collection[-2]))
             iteration += 1
 
             if os.path.exists(best_policy_bin_name):
@@ -215,21 +224,18 @@ class IRL:
                 pickle.dump([Best_agents, t_collection], f)
 
         ipdb.set_trace()
-        
         return
 
 
 if __name__ == '__main__':
-    exp_name = get_test_record_title("CartPole-v0", 1000, 'initial2', num_tests=1, important_sampling=True)
-    traj_name = exp_name + '_num_traj100_pickle.bin'
+    exp_name = get_test_record_title("CartPole-v0", 999, 'keepBA&notRB', num_tests=1, important_sampling=True)
+    traj_name = exp_name + '_#Trajectories100_pickle.bin'
     with open(traj_name, 'rb') as rf:
-        expert_trajectories = pickle.load(rf) #[[state, action, reward, next_state, done], ...]
+        expert_trajectories = pickle.load(rf)  #[[state, action, reward, next_state, done], ...]
 
-    #best_agent = get_best_agent('CartPole-v0', 1000, 'initial2', num_tests=1, important_sampling=True)
     state_dim = 4
-    num_basis = 10
-    feature_means_name = "reward_basis_statedim{}_numbasis{}_pickle.bin".format(state_dim,
-                                                                                num_basis)
+    num_basis = 9
+    feature_means_name = "CartPole-v0_RewardBasis{}_pickle.bin".format(num_basis)
     with open(feature_means_name, 'rb') as rf:
         feature_means = pickle.load(rf)
 
@@ -238,6 +244,6 @@ if __name__ == '__main__':
     reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
     epsilon = 0.1
 
-    irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon) 
+    irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon)
     irl.loop()
     ipdb.set_trace()

@@ -12,10 +12,9 @@ import random
 from record import get_test_record_title
 import tf_utils
 
-#TRANSITION = 15000
+TRANSITION = 15000
 #EPISODE = 20
 #MEMORY_SIZE = TRANSITION + 1000
-NUM_ACTION_ITER = 1000
 NUM_REWARD_ITER = 1000
 NUM_EVALUATION = 100
 NUM_EPISODES = 300
@@ -71,7 +70,7 @@ class DeepRewardNetwork:
         trajectories = [] # state, action, next_state
         for i in range(NUM_REWARD_ITER):
             state = env.reset()
-            for j in range(2000):
+            for j in range(TRANSITION):
                 action = env.action_space.sample()
                 next_state, _, done, info = env.step(action)
                 trajectories.append([state, action, next_state])
@@ -94,9 +93,10 @@ class DeepRewardNetwork:
             next_max_q_values = np.asarray(next_max_q_values)
 
             reward_targets = q_values - self.gamma * next_max_q_values
-            loss, _ = sess.run([self.loss, self.train_op], feed_dict={self.state_input:cur_states_batch,
-                                                                      self.reward_target:reward_targets})
-            
+            loss, _ = self.sess.run([self.loss, self.train_op],
+                                    feed_dict={self.state_input: cur_states_batch,
+                                               self.reward_target: reward_targets
+                                               })
             if i % 10 == 0:
                 print("i : {}, {}".format(i, loss))
         # for end

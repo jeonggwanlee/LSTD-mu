@@ -36,12 +36,12 @@ class IRL_LSTDMU:
         action_dim = 1
         self.memory = Memory(MEMORY_SIZE, BATCH_SIZE, action_dim, state_dim)
         self.mu_expert = self.compute_feature_expectation(expert_trajectories)
-
+        self.update = None
+        self.prev_update = None # for debug
 
     def _generate_trajectories_from_initial_policy(self, n_trajectories=1000):
         trajectories = []
         for _ in range(n_trajectories):
-            self.env.seed()
             state = self.env.reset()
             trajectory = []
             for _ in range(TRANSITION):  # TRANSITION
@@ -64,7 +64,6 @@ class IRL_LSTDMU:
     def _generate_new_trajectories(self, agent, n_trajectories=1000):
         trajectories = []
         for _ in range(n_trajectories):
-            self.env.seed()
             state = self.env.reset()
 
             trajectory = []
@@ -175,10 +174,10 @@ class IRL_LSTDMU:
         return Best_agent
 
 
-    def loop(self):
+    def loop(self, loop_iter):
 
         p = self.reward_basis._num_basis()
-        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_lstdmu_pickle.bin".format(p, important_sampling, EPISODE)
+        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_lstdmu_pickle_{}.bin".format(p, important_sampling, EPISODE, loop_iter)
 
         print("#Experiment name : ", best_policy_bin_name)
         iteration = 0
@@ -211,8 +210,6 @@ class IRL_LSTDMU:
                                               self.theta,
                                               isRender=False)
 
-
-            self.memory.clear_memory()
             Best_agents.append(best_agent)
            
             test_reward = IRL_test(self.env, best_agent, iteration)
@@ -221,37 +218,48 @@ class IRL_LSTDMU:
             # Time checker 1
             start = datetime.datetime.now()
 
+            # CANDIDATE 1.
             # Get psi(s0)
             _psi_sum = np.zeros((q,))
+            # debug!
+            #s0 = self.env.reset()
+
             for i in range(PSI_S0_ITERATION):
+                ## debug!
                 _psi = psi_function.evaluate(self.env.reset(), self.env.action_space.sample())
+                #_psi = psi_function.evaluate(s0, self.env.action_space.sample())
                 _psi_sum += _psi
             psi = _psi_sum / PSI_S0_ITERATION
             psi = np.resize(psi, [len(psi), 1])
 
-            # sampling
+            # CANDIDATE 2.
+            # Optimal policy sampling
+            self.memory.clear_memory()
             for i in range(NUM_LSTDMU_SAMPLING):
                 state = self.env.reset()
                 for j in range(TRANSITION):
+                    #env.render()
                     action = best_agent.act(state)
                     next_state, _, done, _ = self.env.step(action)
-                    self.memory.add([state, action, None, next_state, done])
+                    self.memory.add([state, action, None, next_state, done]) # s, a, s`
+                    state = next_state
                     if done:
                         break
 
+            # Candiate 3   
             # collect sample done
-            jth_policy = best_agent.policy
+            jth_optimal_policy = best_agent.policy
             lstd_mu = LSTD_MU(psi_function, self.gamma)
-            samples = self.memory.select_sample(BATCH_SIZE * 2)
+            samples = self.memory.select_sample(BATCH_SIZE * 8)
             self.memory.clear_memory()
             if important_sampling:
-                xi = lstd_mu.train_parameter_with_important_sampling(samples,
-                                                                     jth_policy,
-                                                                     self.reward_basis)
+                xi = lstd_mu.train_parameter_xi_with_important_sampling(samples,
+                                                                        jth_optimal_policy,
+                                                                        self.reward_basis)
             else:
-                xi = lstd_mu.train_parameter(samples, jth_policy, self.reward_basis)
-            mu_origin = np.dot(xi.T, psi)
-            mu_origin = np.reshape(mu_origin, [-1])
+                xi = lstd_mu.train_parameter_xi(samples, jth_optimal_policy, self.reward_basis)
+            mu_origin = np.matmul(xi.T, psi)  # (p, q) x (q, 1)
+            mu_origin = np.reshape(mu_origin, [p])
             
             # Time checker 2
             first_end = datetime.datetime.now()
@@ -259,17 +267,23 @@ class IRL_LSTDMU:
 
             new_trajectories = self._generate_new_trajectories(best_agent, n_trajectories=1000)
             mu = self.compute_feature_expectation(new_trajectories)
-            
+            mu_diff = mu - mu_origin
+            print("mu_diff ", mu_diff)
+
             # Time checker 3
             second_end = datetime.datetime.now()
             second_end_result = second_end - first_end
-            # print(first_end_result)
-            # print(second_end_result)
             time_checker_collection.append([first_end_result, second_end_result])
 
+            # 2. Projection method
             #updated_loss = mu - self.mu_bar
             updated_loss = mu_origin - self.mu_bar
-            self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
+            #self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
+            import copy
+            self.prev_update = copy.deepcopy(self.update)
+            self.update = (updated_loss.dot(self.theta) / np.square(updated_loss).sum()) * updated_loss
+            mu_bar_prev = copy.deepcopy(self.mu_bar)
+            self.mu_bar = self.mu_bar + self.update
             self.theta = self.mu_expert - self.mu_bar
             t = np.linalg.norm(self.theta, 2)
             t_collection.append(t)
@@ -293,7 +307,11 @@ class IRL_LSTDMU:
 
 if __name__ == '__main__':
     exp_name = get_test_record_title("CartPole-v0", 999, 'keepBA&notRB', num_tests=1, important_sampling=True)
-    traj_name = exp_name + '_#Trajectories100_pickle.bin'
+
+    num_traj = 400
+
+    traj_name = exp_name + '_#Trajectories{}_pickle.bin'.format(num_traj)
+    print("trajectory file name {} ".format(traj_name))
     with open(traj_name, 'rb') as rf:
         expert_trajectories = pickle.load(rf)  #[[state, action, reward, next_state, done], ...]
 
@@ -310,5 +328,9 @@ if __name__ == '__main__':
     reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
     epsilon = 0.1
 
-    irl = IRL_LSTDMU(env, reward_basis, expert_trajectories, gamma, epsilon)
-    irl.loop()
+    #loop_iteration = list(range(10))[2:]
+    #loop_iteration = ['DEBUG_8mul']
+    loop_iteration = ["#Trajs{}".format(num_traj)]
+    for it in loop_iteration:
+        irl = IRL_LSTDMU(env, reward_basis, expert_trajectories, gamma, epsilon)
+        irl.loop(it)

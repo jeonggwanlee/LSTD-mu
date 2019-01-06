@@ -172,10 +172,10 @@ class IRL:
         return Best_agent
 
 
-    def loop(self):
+    def loop(self, loop_iter):
 
         p = self.reward_basis._num_basis()
-        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_pickle.bin".format(p, important_sampling, EPISODE)
+        best_policy_bin_name = "CartPole-v0_RewardBasis{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_pickle_{}.bin".format(p, important_sampling, EPISODE, loop_iter)
 
         print("#Experiment name : ", best_policy_bin_name)
 
@@ -236,7 +236,11 @@ class IRL:
 
 if __name__ == '__main__':
     exp_name = get_test_record_title("CartPole-v0", 999, 'keepBA&notRB', num_tests=1, important_sampling=True)
-    traj_name = exp_name + '_#Trajectories100_pickle.bin'
+
+    num_traj = 100
+    
+    traj_name = exp_name + '_#Trajectories{}_pickle.bin'.format(num_traj)
+    print("trajectory file name {} ".format(traj_name))
     with open(traj_name, 'rb') as rf:
         expert_trajectories = pickle.load(rf)  #[[state, action, reward, next_state, done], ...]
 
@@ -251,5 +255,9 @@ if __name__ == '__main__':
     reward_basis = RewardBasis(state_dim, num_basis, gamma, feature_means)
     epsilon = 0.1
 
-    irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon)
-    irl.loop()
+    #iteration_loop = list(range(10))[2:]
+    iteration_loop = ["#Trajs{}".format(num_traj)]
+    for it in iteration_loop:
+        irl = IRL(env, reward_basis, expert_trajectories, gamma, epsilon)
+        irl.loop(it)
+

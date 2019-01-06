@@ -174,11 +174,11 @@ class IRL_DAN:
 
         return Best_agent
 
-    def loop(self):
+    def loop(self, loop_iter):
 
         pre_soft = self.dan.pre_soft
         dan_output = self.dan._num_basis()
-        best_policy_bin_name = "CartPole-v0_DAN{}_PreSoft{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_dan_pickle.bin".format(dan_output, pre_soft, important_sampling, EPISODE)
+        best_policy_bin_name = "CartPole-v0_DAN{}_PreSoft{}_ImportantSampling{}_FindBestAgentEpi{}_best_policy_irl_dan_pickle_{}.bin".format(dan_output, pre_soft, important_sampling, EPISODE, loop_iter)
  
         print("#Experiment name : ", best_policy_bin_name)
         iteration = 0
@@ -249,5 +249,7 @@ if __name__ == '__main__':
     gamma = 0.99
     epsilon = 0.1
 
-    irl = IRL_DAN(env, dan, expert_trajectories, gamma, epsilon)
-    irl.loop()
+    iteration_loop = list(range(10))[2:]
+    for it in iteration_loop:
+        irl = IRL_DAN(env, dan, expert_trajectories, gamma, epsilon)
+        irl.loop(it)

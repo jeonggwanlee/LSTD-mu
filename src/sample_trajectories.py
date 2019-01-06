@@ -6,7 +6,7 @@ from test import get_best_agent, test_policy
 from record import get_test_record_title
 
 TRANSITION = 15000
-NUM_TRAJECTORIES = 100
+NUM_TRAJECTORIES = 400
 
 def sample_trajectories_from_expert(game_name,
                                     episode,
@@ -32,7 +32,7 @@ def sample_trajectories_from_expert(game_name,
             state = next_state
             if done:
                 if i % 10 == 0:
-                    print("trajectories done j {}/{}".format(j, num_trajectories))
+                    print("trajectories done j {}/{}".format(i, num_trajectories))
                 break
 
         trajectories.append(trajectory)

@@ -39,7 +39,7 @@ def IRL_test(env, best_agent, iter, isRender=False):
         total_rewards.append(total_reward)
 
     reward = sum(total_rewards) / NUM_EVALUATION
-    print("{}'s agent {} ".format(iter, reward))
+    print("{}'s agent ####################{} ".format(iter, reward))
 
     return reward
 

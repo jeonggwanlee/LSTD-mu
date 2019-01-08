@@ -20,7 +20,7 @@ MEMORY_SIZE = TRANSITION + 1000
 NUM_EVALUATION = 100
 PSI_S0_ITERATION = 1000
 NUM_LSTDMU_SAMPLING = 1000
-important_sampling = True
+important_sampling = False
 
 class IRL_LSTDMU:
     def __init__(self, env, reward_basis, expert_trajectories, gamma, epsilon):
@@ -239,7 +239,9 @@ class IRL_LSTDMU:
                 state = self.env.reset()
                 for j in range(TRANSITION):
                     #env.render()
-                    action = best_agent.act(state)
+                    #action = best_agent.act(state)
+                    ### DEBUG, option name lstdmu_random
+                    action = self.env.action_space.sample()
                     next_state, _, done, _ = self.env.step(action)
                     self.memory.add([state, action, None, next_state, done]) # s, a, s`
                     state = next_state
@@ -308,7 +310,7 @@ class IRL_LSTDMU:
 if __name__ == '__main__':
     exp_name = get_test_record_title("CartPole-v0", 999, 'keepBA&notRB', num_tests=1, important_sampling=True)
 
-    num_traj = 400
+    num_traj = 100
 
     traj_name = exp_name + '_#Trajectories{}_pickle.bin'.format(num_traj)
     print("trajectory file name {} ".format(traj_name))
@@ -330,7 +332,7 @@ if __name__ == '__main__':
 
     #loop_iteration = list(range(10))[2:]
     #loop_iteration = ['DEBUG_8mul']
-    loop_iteration = ["#Trajs{}".format(num_traj)]
+    loop_iteration = ["#Trajs{}_LSTDMUSAMPLING_random".format(num_traj)]
     for it in loop_iteration:
         irl = IRL_LSTDMU(env, reward_basis, expert_trajectories, gamma, epsilon)
         irl.loop(it)

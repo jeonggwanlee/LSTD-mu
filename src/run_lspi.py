@@ -204,6 +204,95 @@ def _keep_best_agent_and_not_roll_back_sample(env,
     return env, Best_agent
 
 
+def _reuse_sample2(env,
+                                              memory,
+                                              agent,
+                                              game_name,
+                                              csv_name,
+                                              bin_name,
+                                              isRender=False):
+    """
+    keepBA&notRB
+    """
+    Best_agent_list = []
+    mean_reward = float('-inf')
+    Best_mean_reward = float('-inf')
+    Best_agent = None
+    Best_agent_copy = None
+
+    for i in range(EPISODE):
+        # Intializaiton
+        state = env.reset()
+
+        # Collect samples
+        for j in range(TRANSITION):
+            if isRender:
+                env.render()
+            if i < 50:
+                action = env.action_space.sample()
+            else:
+                if j < 50:
+                    env.render()
+                action = Best_agent.act(state)
+            next_state, reward, done, info = env.step(action)
+            memory.add([state, action, reward, next_state, done])
+            state = next_state
+            if done:
+                break
+
+        # Get batch of samples and Training
+        if memory.container_size < BATCH_SIZE:
+            sample = memory.select_sample(memory.container_size)
+        else:
+            sample = memory.select_sample(BATCH_SIZE)
+        error = agent.train(sample, important_sampling)
+
+        # Get middle mean
+        reward_list = []
+        for j in range(NUM_TESTS_PER_EPISODE):
+            total_reward, _ = test_policy(env, agent)
+            reward_list.append(total_reward)
+            # if j % 10 == 0:
+            #     print("test_policy j : {}/{}".format(j, NUM_TESTS_PER_EPISODE))
+        mean_reward = sum(reward_list) / NUM_TESTS_PER_EPISODE
+
+        # Write csv
+        with open(csv_name, 'a') as f:
+            f.write("{}\n".format(mean_reward))
+
+        # If getting the best reward, model will collect and learn
+                                        # greedy samples at next iteration
+        if Best_mean_reward < mean_reward:
+            Best_agent = agent
+            Best_mean_reward = mean_reward
+            memory.clear_memory()
+            Best_agent_copy = copy.deepcopy(Best_agent)
+            Best_agent_list.append(Best_agent_copy)
+            # Write csv
+            with open(csv_name, 'a') as f:
+                print("# Get Best agent {}".format(mean_reward))
+                f.write("# Get Best agent\n")
+            
+            if os.path.exists(bin_name):
+                os.remove(bin_name)
+            with open(bin_name, 'wb') as f:
+                pickle.dump(Best_agent_list, f)
+        #else 
+            # not role back
+        
+        if i % 10 == 0:
+            print('[episode {}] done'.format(i))
+    #for i in range(EPISODE)
+   
+    # Clean up
+    memory.clear_memory()
+
+    return env, Best_agent
+
+
+
+
+
 def _initial_sample(env, memory, agent, game_name, isRender=False):
     Best_agent_list = []
     mean_reward = -4000
@@ -219,7 +308,10 @@ def _initial_sample(env, memory, agent, game_name, isRender=False):
         for j in range(TRANSITION):
             if isRender:
                 env.render()
-            action = env.action_space.sample()
+            if i == 0:
+                action = env.action_space.sample()
+            else:
+                action = Best_agent.act(state)
             next_state, reward, done, info = env.step(action)
             memory.add([state, action, reward, next_state, done])
             state = next_state
@@ -365,13 +457,13 @@ def do_lspi(env, memory, agent, game_name, csv_name, bin_name, trainopt='random'
                                                                     bin_name,
                                                                     isRender=False)
     elif trainopt == 'reuse':
-        env, best_agent = _reuse_sample(env,
-                                        memory,
-                                        agent,
-                                        game_name,
-                                        csv_name,
-                                        bin_name,
-                                        isRender=False)
+        env, best_agent = _reuse_sample2(env,
+                                         memory,
+                                         agent,
+                                         game_name,
+                                         csv_name,
+                                         bin_name,
+                                         isRender=False)
     else:
         raise ValueError('wrong trainopt')
 
@@ -478,7 +570,7 @@ def pickle_test():
 
 if __name__ == '__main__':
     #_main('initial')
-    _main('keepBA&notRB', 'CartPole')
+    _main('reuse', 'CartPole')
     #_main('keepBA&notRB', 'Acrobot')
     #_main('keepBA&notRB', 'Pendulum')
 

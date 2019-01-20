@@ -29,37 +29,62 @@ class LSPI:
         policy(pi) : initial policy
     """
     #def __init__(self, num_actions=3, num_means=2, gamma=0.99):
-    def __init__(self, num_actions=3, state_dim=2, gamma=0.99):
+    def __init__(self, num_actions=2, state_dim=4, basis_function_dim=5, gamma=0.99, opt="sigmoid", saved_basis_use=True, center_opt="random"):
         """
         num_actions. Number of actions. Int.
         state_dim. Number of means. Int. (= state_dim)
         gamma. Float.
         """
-        
-        #print ("LSPI init!")
-        #print ("num_actions : %d, state_dim(dim_of_states) : %d" %
-        #        (num_actions, state_dim))
+        # num_features = state_dim + 1  # for convenience
+        basis_function_pickle_name = "LSPI_bf_#State{}_#Features{}_#Action{}_Opt{}_CenterOpt{}.pickle".format(
+                                                                                        state_dim,
+                                                                               basis_function_dim,
+                                                                                      num_actions,
+                                                                                              opt,
+                                                                                        center_opt)
 
-        num_features = state_dim + 1 # for convenience
-        basis_function_pickle_name = "LSPI_basis_function_STATEDIM{}_#Features{}_#Action{}_gamma{}.pickle".format(state_dim,
-                                                                                                                  num_features,
-                                                                                                                  num_actions,
-                                                                                                                  str(gamma)[2:])
+        print("basis_function_pickle_name : {}".format(basis_function_pickle_name))
         if os.path.exists(basis_function_pickle_name):
-            #print("load same psi basis function")
-            with open(basis_function_pickle_name, 'rb') as rf:
-                self.basis_function = pickle.load(rf)
-        else:
-            self.basis_function = Basis_Function(state_dim, num_features, num_actions, gamma)
-            with open(basis_function_pickle_name, 'wb') as wf:
-                pickle.dump(self.basis_function, wf)
+            if saved_basis_use:
+                print("I found same basis function, and your option is \"saved_basis_use\"=True. So, If you want to use saved one, please enter \"y\"")
+                input_str = input()
+                if input_str != "y":
+                    print("you didn't press \"y\"")
+                    exit()
+                print("!!!load same psi basis function")
+                with open(basis_function_pickle_name, 'rb') as rf:
+                    self.basis_function = pickle.load(rf)
+            else:
+                print("I found same psi basis function, If you want to use saved one, please \"saved_basis_use\"=True")
+                print("Do you want to re-create it?(CAUTION)")
+                input_str = input()
+                if input_str == "y":
+                    self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt, center_opt)
 
-        num_basis = self.basis_function._num_basis()
-        actions = list(range(num_actions))
-        self.policy = Policy(self.basis_function, num_basis, actions)
-        self.lstdq = LSTDQ(self.basis_function, gamma, self.policy)
+                    if opt != "deep_cartpole":
+                        with open(basis_function_pickle_name, 'wb') as wf:
+                            pickle.dump(self.basis_function, wf)
+                else:
+                    exit()
+
+        else:
+            self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
+            if opt != "deep_cartpole":
+                with open(basis_function_pickle_name, 'wb') as wf:
+                    pickle.dump(self.basis_function, wf)
+            else:
+                print("LSPI loads deep cartpole")
+        #self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
+
+        self.num_basis = self.basis_function._num_basis()
+        self.actions = list(range(num_actions))
+        self.policy = Policy(self.basis_function, self.num_basis, self.actions)
+        self.lstdq = LSTDQ(self.basis_function, gamma)
         self.stop_criterion = 10**-5
         self.gamma = gamma
+
+    def initialize_policy(self):
+        self.policy = Policy(self.basis_function, self.num_basis, self.actions)
 
     def act(self, state):
         """ phi(s) = argmax_a Q(s, a) and pick first action
@@ -69,75 +94,81 @@ class LSPI:
         return action
 
     def train(self, sample, w_important_sampling=False):
-        
+
         error = float('inf')
-        if w_important_sampling:
-            new_weights = self.lstdq.train_weight_parameter(sample, self.policy)
-        else:
-            new_weights = self.lstdq.train_parameter(sample, self.policy)
+        iter = 0
+        lspi_iteration = 20
+        epsilon = 0.00001
 
-        error = np.linalg.norm((new_weights - self.policy.weights))
-        self.policy.update_weights(new_weights)
+        policy_list = []
+        error_list = []
 
-        return error
+        while epsilon < error and iter < lspi_iteration:
+            policy_list.append(self.policy.weights)
+            if w_important_sampling:
+                new_weights = self.lstdq.train_weight_parameter(sample, self.policy)
+            else:
+                new_weights = self.lstdq.train_parameter(sample, self.policy)
+
+            error = np.linalg.norm((new_weights - self.policy.weights))
+            error_list.append(error)
+            #print("train error {} : {}".format(iter, error))
+            self.policy.update_weights(new_weights)
+            iter += 1
+
+        return error_list
 
 
 class LSTDQ:
-    def __init__(self, basis_function, gamma, init_policy):
+    def __init__(self, basis_function, gamma):
         self.basis_function = basis_function
         self.gamma = gamma
-        self.policy = init_policy
-        self.greedy = [] # for train weight parameter
 
-    def train_parameter(self, sample, policy):
+    def train_parameter(self, sample, greedy_policy):
+
         """ Compute Q value function of current policy
             to obtain the greedy policy
             -> theta
         """
-    
-        self.policy = policy
-        k = self.basis_function._num_basis()
+        p = self.basis_function._num_basis()
 
-        A = np.zeros([k, k])
-        b = np.zeros([k, 1])
-        np.fill_diagonal(A, .1)
+        A = np.zeros([p, p])
+        b = np.zeros([p, 1])
+        np.fill_diagonal(A, .1)  # Singular matrix error
 
-        states      = sample[0]
-        actions     = sample[1]
-        rewards     = sample[2]
+        states = sample[0]
+        actions = sample[1]
+        rewards = sample[2]
         next_states = sample[3]
 
         SAMPLE_SIZE = len(states)
         for i in range(SAMPLE_SIZE):
-            # take action from the greedy target policy
-            action = self.policy.get_best_action(next_states[i])
+            phi = self.basis_function.evaluate(states[i], actions[i])
 
-            phi =      self.basis_function.evaluate(states[i], actions[i])
-            phi_next = self.basis_function.evaluate(next_states[i], action)
-            
+            greedy_action = greedy_policy.get_best_action(next_states[i])
+            phi_next = self.basis_function.evaluate(next_states[i], greedy_action)
+
             loss = (phi - self.gamma * phi_next)
-            phi  = np.resize(phi, [k, 1])
-            loss = np.resize(phi, [1, len(loss)])
+            phi = np.reshape(phi, [p, 1])
+            loss = np.reshape(loss, [1, p])
 
             A = A + np.dot(phi, loss)
             b = b + (phi * rewards[i])
         #end for i in range(len(states)):
-
+ 
         inv_A = np.linalg.inv(A)
-        theta = np.dot(inv_A, b)
+        w = np.dot(inv_A, b)
 
-        return theta
+        return w
 
-    def train_weight_parameter(self, sample, policy):
+    def train_weight_parameter(self, sample, greedy_policy):
         """ Compute Q value function of current policy
             to obtain the greedy policy
         """
 
-        self.policy = policy
-
-        k = self.basis_function._num_basis()
-        A = np.zeros([k, k])
-        b = np.zeros([k, 1])
+        p = self.basis_function._num_basis()
+        A = np.zeros([p, p])
+        b = np.zeros([p, 1])
         np.fill_diagonal(A, .1)
 
         states      = sample[0]
@@ -146,16 +177,13 @@ class LSTDQ:
         next_states = sample[3]
         
         SAMPLE_SIZE = len(states)
-        #self.greedy = np.zeros_like(actions)
-        #self.greedy = np.reshape(self.greedy, [1, len(actions)])
-        #self.greedy = self.greedy[0] # (SAMPLE_SIZE, )
 
         sum_W = 0.0
         W = 1.0
         for i in range(SAMPLE_SIZE):
-            pi_state_best = self.policy.get_best_action(states[i])                # pi(s)^{*} == argmax_{a} Q(s, a)
-            prob_target = self.policy.q_value_function(states[i], pi_state_best)  # Q(s, pi(s)^{*})
-            prob_behavior = self.policy.behavior(states[i], actions[i])           # \hat{Q}(s, a)
+            greedy_action = greedy_policy.get_best_action(states[i])                # pi(s)^{*} == argmax_{a} Q(s, a)
+            prob_target = greedy_policy.q_value_function(states[i], greedy_action)  # Q(s, pi(s)^{*})
+            prob_behavior = greedy_policy.behavior(states[i], actions[i])           # \hat{Q}(s, a)
 
             if prob_behavior == 0.0:
                 W = 0
@@ -164,24 +192,21 @@ class LSTDQ:
                 sum_W = sum_W + W
 
         for i in range(SAMPLE_SIZE):
-            pi_next_state_best = self.policy.get_best_action(next_states[i])  # max pi(s') == argmax_{a'} Q(s', a')
-            phi = self.basis_function.evaluate(states[i], actions[i])                   # phi(s, a)
-            phi_next = self.basis_function.evaluate(next_states[i], pi_next_state_best) # phi(s', pi(s')^{*})
+            greedy_next_action = greedy_policy.get_best_action(next_states[i])
+            phi = self.basis_function.evaluate(states[i], actions[i])
+            phi_next = self.basis_function.evaluate(next_states[i], greedy_next_action)
 
-            pi_state_best = self.policy.get_best_action(states[i])                 # pi(s)^{*}
-            prob_target = self.policy.q_value_function(states[i], pi_state_best)   # Q(s, pi(s)^{*})
-            prob_behavior = self.policy.behavior(states[i], actions[i])            # \hat{Q}(s, a)
+            greedy_action = greedy_policy.get_best_action(states[i])                 # pi(s)^{*}
+            prob_target = greedy_policy.q_value_function(states[i], greedy_action)   # Q(s, pi(s)^{*})
+            prob_behavior = greedy_policy.behavior(states[i], actions[i])            # \hat{Q}(s, a)
 
-            #self.greedy[i] = pi_state_best
-
-            #exp = i - SAMPLE_SIZE   #[-SAMPLE_SIZE, ...]
             norm_W = (prob_target / prob_behavior) / sum_W   # (Q(s, pi(s)^{*}) / \hat{Q}(s, a)) / sum_W
 
             # important weighting on the whole transition
             loss = norm_W * (phi - self.gamma * phi_next)
 
-            phi = np.resize(phi, [k, 1])
-            loss = np.resize(phi, [1, len(loss)])
+            phi = np.resize(phi, [p, 1])
+            loss = np.resize(loss, [1, len(loss)])
 
             A = A + np.dot(phi, loss)
             b = b + (phi * rewards[i])

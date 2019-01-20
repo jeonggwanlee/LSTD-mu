@@ -15,8 +15,7 @@ import tf_utils
 #TRANSITION = 15000
 #EPISODE = 20
 #MEMORY_SIZE = TRANSITION + 1000
-NUM_ACTION_ITER = 1000
-NUM_REWARD_ITER = 1000
+NUM_ACTION_ITER = 2000
 NUM_EVALUATION = 100
 NUM_EPISODES = 300
 MAX_STEPS = 300
@@ -58,17 +57,21 @@ class DeepActionNetwork:
             self.state_input = tf.placeholder(tf.float32, [None, self.state_size])
             self.action = tf.placeholder(tf.int32, [None])
             self.fc1 = tf_utils.fc(self.state_input, self.n_h1, scope="fc1",
-                              activation_fn=tf.nn.elu,
+                              activation_fn=tf.nn.relu,
                               initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
             self.fc2 = tf_utils.fc(self.fc1, self.n_h2, scope="fc2",
-                                   activation_fn=tf.nn.elu,
+                                   activation_fn=tf.nn.relu,
                                    initializer=tf.contrib.layers.variance_scaling_initializer(mode="FAN_IN"))
             self.fc2_softmax = tf.nn.softmax(self.fc2, name="fc2_softmax")
             self.q_value = tf_utils.fc(self.fc2, self.action_size, activation_fn=None)
 
             self.action_pred = tf.nn.softmax(self.q_value, name="action")
             self.action_target = tf.one_hot(self.action, self.action_size, on_value=1.0, off_value=0.0)
-            self.loss = tf.reduce_mean(tf.square(tf.subtract(self.action_pred, self.action_target)))
+            ipdb.set_trace()
+            self.loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.action_target,
+                                                                   logits=self.action_pred)
+            #ipdb.set_trace()
+            #self.loss = tf.reduce_mean(tf.square(tf.subtract(self.action_pred, self.action_target)))
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
             self.train_op = self.optimizer.minimize(self.loss, global_step=tf.train.get_global_step())
             new_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
@@ -97,7 +100,10 @@ class DeepActionNetwork:
                                                                            self.action:cur_action_batch})
             batch_end += BATCH_SIZE
             if i % 10 == 0:
-                print("Deep Action Network Training iteration {}, {}".format(i, loss))
+                if type(loss) == np.float32:
+                    print("Deep Action Network Training iteration {}, {}".format(i, loss))
+                else:
+                    print("Deep Action Network Training iteration {}, {}".format(i, sum(loss)/BATCH_SIZE))
 
     def get_optimal_action(self, state):
         actions = self.sess.run(self.action_pred, feed_dict={self.state_input: [state]})
@@ -118,15 +124,16 @@ class DeepActionNetwork:
         """ get features's multiple version
         """
         if self.pre_soft:
+            print('pre_soft')
             fc2 = self.sess.run(self.fc2, feed_dict={self.state_input: state})
         else:
             fc2 = self.sess.run(self.fc2_softmax, feed_dict={self.state_input: state})
         return fc2
 
-    def test(self, env, isRender=True):
-        NUM_TEST = 5
-        print("Testing Deep Action Network... {} times".format(NUM_TEST))
-        for i in range(NUM_TEST):
+    def test(self, env, isRender=True, num_test=100):
+        print("Testing Deep Action Network... {} times".format(num_test))
+        timesteps = []
+        for i in range(num_test):
             cur_state = env.reset()
             done = False
             t = 0
@@ -139,7 +146,10 @@ class DeepActionNetwork:
                 cur_state = next_state
                 if done:
                     print("Test DAN {} : {} timesteps".format(i, t))
+                    timesteps.append(t)
                     break
+        print("DAN average test results : {}".format(sum(timesteps)/num_test))
+        ipdb.set_trace()
             #end while
         #end for i
                 

@@ -13,7 +13,7 @@ class Policy:
         self.theta_behavior = theta
 
         if theta is None:
-            self.weights = np.random.uniform(-1.0, 1.0, size=(num_theta,))
+            self.weights = np.random.uniform(-1.0, 1.0, size=(num_theta, 1))
         else:
             self.weights = theta
 

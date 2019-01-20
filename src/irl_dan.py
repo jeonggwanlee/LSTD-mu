@@ -125,11 +125,9 @@ class IRL_DAN:
         return total_reward
 
 
-    def _get_best_agent(self, memory, agent, theta, isRender=False):
-        Best_agent = None
-        Best_mean_reward = float("-inf")
-        mean_reward = float("-inf")
-        # 1000 * 100
+    def agent_train_wrapper(self, agent, memory, theta, isRender=False):
+
+        transition_iter_list = []
         for i in range(EPISODE):
             state = self.env.reset()
             for j in range(TRANSITION):
@@ -138,41 +136,23 @@ class IRL_DAN:
                 action = self.env.action_space.sample()
                 next_state, _, done, _ = self.env.step(action)
                 phi_state = self.dan.get_features(state)
-                # phi_state = self.reward_basis.evaluate(state)
                 reward = np.dot(phi_state, theta.T).min()  # trick
                 memory.add([state, action, reward, next_state, done])
                 state = next_state
                 if done:
+                    transition_iter_list.append(j)
                     break
+        middle_ti = sorted(transition_iter_list)[len(transition_iter_list)//2]
+        average_ti = sum(transition_iter_list) // EPISODE
+        sum_ti = sum(transition_iter_list)
 
-            if memory.container_size < BATCH_SIZE:
-                sample = memory.select_sample(memory.container_size)
-            else:
-                sample = memory.select_sample(BATCH_SIZE)
+        sample = memory.select_sample(memory.container_size)
+        agent.train(sample, w_important_sampling=important_sampling)
             
-            agent.train(sample, w_important_sampling=True)
-            
-            reward_list = []
-            for j in range(NUM_EVALUATION):
-                total_reward = self._test_policy_with_approxi_reward(agent,
-                                                                     self.dan,
-                                                                     theta)
-                reward_list.append(total_reward)
-            mean_reward = sum(reward_list) / NUM_EVALUATION
-
-            if Best_mean_reward < mean_reward:
-                #print("Get Best reward {}".format(mean_reward))
-                Best_agent = copy.deepcopy(agent)
-                Best_mean_reward = mean_reward
-                memory.clear_memory()
-            
-            if i % 20 == 0:
-                print("Find Best Agent iteration i : {}/{}".format(i, EPISODE))
-        # for i
         # Clean up
         memory.clear_memory()
 
-        return Best_agent
+        return agent
 
     def loop(self, loop_iter):
 
@@ -198,13 +178,14 @@ class IRL_DAN:
 
         # 3.
         while t > self.epsilon:
-            print("iteration: ", iteration)
             # 4.
             agent = LSPI(self.num_actions, self.state_dim)
-            best_agent = self._get_best_agent(self.memory,
-                                              agent,
-                                              self.theta,
-                                              isRender=False)
+            ipdb.set_trace()
+            best_agent = self.agent_train_wrapper(agent,
+                                                  self.memory,
+                                                  self.theta,
+                                                  isRender=False)
+            ipdb.set_trace()
             Best_agents.append(best_agent)
             
             # Best agent testing
@@ -219,9 +200,11 @@ class IRL_DAN:
             self.theta = self.mu_expert - self.mu_bar
             t = np.linalg.norm(self.theta, 2)
             t_collection.append(t)
-            print("threshold: ", t)
+            #print("threshold: ", t)
             if iteration > 0:
-                print("threshold_gap: %05f" % (t_collection[-1] - t_collection[-2]))
+                print("iteration %d threshold : %05f, threshold_gap: %05f" % (iteration,
+                                                                              t,
+                                                                              t_collection[-1] - t_collection[-2]))
             iteration += 1
 
             if os.path.exists(best_policy_bin_name):

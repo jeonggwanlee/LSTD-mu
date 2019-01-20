@@ -1,8 +1,10 @@
 import gym
 from record import get_test_record_title
 import pickle
+import ipdb
 
-NUM_EXPERI =1
+NUM_EXPERI = 1
+TRANSITION = 15000
 
 def get_best_agent(game_name, episode, trainopt, num_tests=1, important_sampling=True):
 
@@ -18,11 +20,9 @@ def get_best_agent(game_name, episode, trainopt, num_tests=1, important_sampling
 
 def test_policy(env, agent, isRender=False):
     total_reward = 0.0
-    best_policy = 0
-    env.seed()
 
     state = env.reset()
-    for i in range(5000):
+    for i in range(TRANSITION):
         if isRender:
             env.render()
         action = agent.act(state)
@@ -31,10 +31,9 @@ def test_policy(env, agent, isRender=False):
 
         total_reward += reward
         if done:
-            best_policy = agent.policy
             break
 
-    return total_reward, best_policy
+    return total_reward
 
 def test_agent(game_name, agent, num_iteration, isRender=False): 
 

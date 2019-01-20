@@ -94,15 +94,23 @@ class DQN:
     def learn(self, env):
         for i_epi in range(NUM_EPISODES):
             state = env.reset()
+            average_r = []
             for t in range(MAX_STEPS):
+                env.render()
                 action = self.get_action(state)
                 next_state, _, done, _ = env.step(action)
                 reward = self.rnet.get_reward(state) + 1
+                print("DQN Training episode {} timestep {} reward {}".format(i_epi,
+                                                                             t,
+                                                                             reward))
+                #reward = self.rnet.get_reward(state)
+                average_r.append(reward)
                 # reward = 1
                 if done:
                     reward = -1 # rnet mean is -0.4
                     self.memory_add(state, action, next_state, reward, done)
-                    print("Episode {} finished after {} timesteps".format(i_epi, t+1))
+                    print("DQN Training Episode {} finished after {} timesteps".format(i_epi, t+1))
+                    print("average reward : {}".format(sum(average_r)/t))
                     break
                 self.memory_add(state, action, next_state, reward, done)
                 state = next_state

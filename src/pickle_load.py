@@ -4,12 +4,13 @@ import ipdb
 dan_opt = False
 
 game_name = "CartPole-v0"
-irl_name = "irl_lstdmu"
+irl_name = "irl"
 important_sampling = False
 
 #index_list = ["", "_2", "_3", "_4", "_5"]
 #index_list = ["_DEBUG", "_DEBUG2", "_DEBUG_8mul"]
-index_list = ["_#Trajs100"]
+#index_list = ["_#Trajs1", "_#Trajs10", "_#Trajs50", "_#Trajs100", "_#Trajs200", "_#Trajs400"]
+index_list = ["_#Trajs100_sigmoid"]
 #index_list = ["_#Trajs50"]
 #index_list = ["_#Trajs100_LSTDMUSAMPLING_random"]
 
@@ -19,7 +20,7 @@ index_zip_str = '%'.join(index_list)
 if dan_opt:
     excel_file = "{}_DAN9_PreSoftFalse_ImportantSampling{}_FindBestAgentEpi30_best_policy_{}_analysis_{}.csv".format(game_name, important_sampling, irl_name, index_zip_str)
 else:
-    excel_file = "{}_RewardBasis9_ImportantSampling{}_FindBestAgentEpi30_best_policy_{}_analysis_{}.csv".format(game_name, important_sampling, irl_name, index_zip_str)
+    excel_file = "{}_RewardBasis9_ImportantSampling{}_FindBestAgentEpi200_best_policy_{}_analysis_{}.csv".format(game_name, important_sampling, irl_name, index_zip_str)
     
 
 t_collection_list = []
@@ -31,7 +32,7 @@ for index in index_list:
     if dan_opt:
         bin_file = "{}_DAN9_PreSoftFalse_ImportantSampling{}_FindBestAgentEpi30_best_policy_{}_pickle{}.bin".format(game_name, important_sampling, irl_name, index)
     else:
-        bin_file = "{}_RewardBasis9_ImportantSampling{}_FindBestAgentEpi30_best_policy_{}_pickle{}.bin".format(game_name, important_sampling, irl_name, index)
+        bin_file = "{}_RewardBasis9_ImportantSampling{}_FindBestAgentEpi200_best_policy_{}_pickle{}.bin".format(game_name, important_sampling, irl_name, index)
     
 
     with open(bin_file, 'rb') as rf:

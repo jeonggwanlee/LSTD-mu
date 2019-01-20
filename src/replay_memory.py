@@ -5,18 +5,13 @@ import ipdb
 
 class Memory:
 
-    def __init__(self, MemorySize, batch_size, act_dim, obs_dim):
-        self.memory_size = MemorySize
-        self.batch_size = batch_size
+    def __init__(self, memory_size, act_dim, obs_dim):
+        self.memory_size = memory_size
         self.container = memory.deque()
         self.container_size = 0
         self.priority = 1
         self.act_dim = act_dim
         self.obs_dim = obs_dim
-
-    def _batch_size(self):
-        # not used
-        return self.batch_size
 
     def _container_size(self):
         return self.container_size

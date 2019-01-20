@@ -1,26 +1,15 @@
 import pickle
 import gym
 import ipdb
-NUM_EVALUATION = 100
+import numpy as np
+NUM_EVALUATION = 300
 TRANSITION = 3000
 isRender = False
 
-#best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_pickle.bin"
 
-#best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_dan_pickle.bin"
-
-
-#best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_mu_dan_pickle.bin"
-#best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_mu_pickle.bin"
-
-#best_policy_bin_name = "CartPole-v0_RewardBasis9_ImportantSamplingTrue_best_policy_irl_lstdmu_actually_notlstdmu_pickle.bin"
-
-
-
-def IRL_test(env, best_agent, iter, isRender=False):
+def IRL_test(env, best_agent, iter, num_eval=100, isRender=False):
     total_rewards = []
-    for i in range(NUM_EVALUATION):
-        env.seed()
+    for i in range(num_eval):
         state = env.reset()
         total_reward = 0.0
 
@@ -37,11 +26,21 @@ def IRL_test(env, best_agent, iter, isRender=False):
         # for _
         #print(total_reward)
         total_rewards.append(total_reward)
+        #if i % (num_eval//5) == 0:
+        #    print("IRL_test {}/{}".format(i, num_eval))
 
-    reward = sum(total_rewards) / NUM_EVALUATION
-    print("{}'s agent ####################{} ".format(iter, reward))
+    best = max(total_rewards)
+    worst = min(total_rewards)
+    variance = np.var(total_rewards) ** (1/2)
+    mean_reward = sum(total_rewards) / num_eval
+    print("##########{0}'s agent (trainiteration{1}) mean : {2:.2f} best : {3:.2f} worst : {4:.2f} variance : {5:.2f}".format(iter,
+               num_eval,
+               mean_reward,
+               best,
+               worst,
+               variance))
 
-    return reward
+    return mean_reward, best, worst, variance
 
 if __name__ == '__main__':
 #best_policy_bin_name = "CartPole-v0_statedim4_numbasis10_best_policy_pickle.bin"

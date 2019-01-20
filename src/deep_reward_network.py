@@ -97,8 +97,9 @@ class DeepRewardNetwork:
                                     feed_dict={self.state_input: cur_states_batch,
                                                self.reward_target: reward_targets
                                                })
+            loss = loss / BATCH_SIZE
             if i % 10 == 0:
-                print("i : {}, {}".format(i, loss))
+                print("Deep Reward Network iteration : {}, loss : {}".format(i, loss))
         # for end
 
     def get_reward(self, state):

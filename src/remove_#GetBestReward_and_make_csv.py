@@ -1,10 +1,10 @@
 import ipdb
 
-file_name = '/Users/jklee/temporal_git/LSTD-mu/src/CartPole-v0_EPI1000_initial2_#Test1_important_sampling_KEEP.csv'
+#file_name = '/Users/jklee/temporal_git/LSTD-mu/src/CartPole-v0_EPI1000_initial2_#Test1_important_sampling_KEEP.csv'
+file_name = 'CartPole-v0_EPI996_keepBA&notRB_#Trials1.csv'
 
 with open(file_name, 'r') as f:
     lines = [l for l in f]
-    ipdb.set_trace()
 
 new_values = []
 for line in lines:

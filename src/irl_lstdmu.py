@@ -19,8 +19,8 @@ important_sampling = False
 
 
 class IRL_LSTDMU:
-    def __init__(self, env, reward_basis, gamma, epsilon, lspi_bfdim=20, lspi_bfopt="deep_cartpole",
-                 episode_for_train=100, num_expert=200, num_new_traj=200, num_eval=100, psi_s0_iter=100):
+    def __init__(self, env, reward_basis, gamma, epsilon, debug_name, lspi_bfdim=20, lspi_bfopt="deep_cartpole",
+                 num_traj_for_policy=100, num_expert=200, num_traj_for_mu=200, num_eval=100, psi_s0_iter=100):
         self.env = env
         self.reward_basis = reward_basis
         self.gamma = gamma
@@ -38,27 +38,26 @@ class IRL_LSTDMU:
                                                             n_trajectories=num_expert)
         self.mu_expert = self.compute_feature_expectation(self.expert_trajectories)
 
-        self.episode_for_train = episode_for_train
-        self.num_new_traj = num_new_traj
+        self.num_traj_for_policy = num_traj_for_policy
+        self.num_traj_for_mu = num_traj_for_mu
         self.num_eval = num_eval
         self.psi_s0_iter = psi_s0_iter
 
         # Bin name definition
         self.p = self.reward_basis._num_basis()
-        self.csv_name = "CartPole-v0_#Expert{}_#NewTrajPerLSPI{}_RBOpt{}_RBDim{}_TrainEpisode{}_LSPIBFOpt{}_LSPIBFDim{}_#Eval{}.csv".format(
+        self.csv_name = "CartPole-v0_#Expert{}_#NewTrajPerLSPI{}_RBOpt{}_RBDim{}_TrainEpisode{}_LSPIBFOpt{}_LSPIBFDim{}_#Eval{}_LSTDMU_{}.csv".format(
                 num_expert,
-                self.num_new_traj,
+                self.num_traj_for_mu,
                 self.reward_basis.opt,
                 self.p,
-                episode_for_train,
+                num_traj_for_policy,
                 lspi_bfopt,
                 lspi_bfdim,
-                num_eval)
+                num_eval,
+                debug_name)
         print("#csv name : ", self.csv_name)
         with open(self.csv_name, 'a') as f:
             f.write("t,best,mean,worst,sd,mean_ar,std_ar\n")
-
-        self.update = None
 
     def _generate_trajectories_from_initial_policy(self, n_trajectories=100):
         trajectories = []
@@ -162,7 +161,7 @@ class IRL_LSTDMU:
     def agent_train_wrapper(self, memory, theta, isRender=False):
 
         approx_rewards = []
-        for i in range(self.episode_for_train):
+        for i in range(self.num_traj_for_policy):
             state = self.env.reset()
             for j in range(TRANSITION):
                 if isRender:
@@ -188,7 +187,7 @@ class IRL_LSTDMU:
         memory.clear_memory()
         return mean, std
 
-    def loop(self, loop_iter):
+    def loop(self):
 
         # psi function for psi_s0
         psi_function = self.agent.basis_function
@@ -198,6 +197,7 @@ class IRL_LSTDMU:
         iteration = 0
         t_collection = []
         test_reward_collection = []
+        speed_collection = []
 
         # Time checker definition
         time_checker_option = True
@@ -238,7 +238,7 @@ class IRL_LSTDMU:
             psi = np.resize(psi, [len(psi), 1])
 
             # Optimal policy sampling
-            for i in range(self.num_new_traj):
+            for i in range(self.num_traj_for_mu):
                 state = self.env.reset()  # s0
                 for j in range(TRANSITION):
                     action = self.env.action_space.sample()  # a0, a1, a2, ...
@@ -251,7 +251,6 @@ class IRL_LSTDMU:
             jth_optimal_policy = self.agent.policy
             lstd_mu = LSTD_MU(psi_function, self.gamma)
             samples = self.memory.select_sample(self.memory.container_size)
-            print("samples length : {}".format(len(samples[0])))
             self.memory.clear_memory()
             # for lstdmu sampling finish
             if important_sampling:
@@ -268,7 +267,7 @@ class IRL_LSTDMU:
             first_end_result = first_end - start
 
             if time_checker_option:
-                new_trajectories = self._generate_new_trajectories(self.agent, n_trajectories=self.num_new_traj)
+                new_trajectories = self._generate_new_trajectories(self.agent, n_trajectories=100)
                 mu = self.compute_feature_expectation(new_trajectories)
                 mu_diff = mu - mu_origin
                 print("mu_norm : {}".format(np.linalg.norm(mu_diff)))
@@ -278,6 +277,9 @@ class IRL_LSTDMU:
             second_end = datetime.datetime.now()
             second_end_result = second_end - first_end
             time_checker_collection.append([first_end_result, second_end_result])
+            speed = second_end_result / first_end_result
+            print("speed : ", speed)
+            speed_collection.append(speed)
 
             # 2. Projection method
             updated_loss = mu_origin - self.mu_bar
@@ -288,16 +290,17 @@ class IRL_LSTDMU:
 
             if iteration == 0:
                 th_gap = initial_t - t_collection[-1]
-                print("iteration {0:} threshold : {1:.5f}".format(iteration, t))
+                print("iteration {0:} threshold : {1:.5f}, speed: {2:}".format(iteration, t, speed))
             elif iteration > 0:
                 th_gap = t_collection[-1] - t_collection[-2]
-                print("iteration {0:} threshold : {1:.5f}, threshold_gap: {2:.5f}".format(
+                print("iteration {0:} threshold : {1:.5f}, threshold_gap: {2:.5f}, speed: {3:}".format(
                                                                               iteration,
                                                                               t,
-                                                                              th_gap))
+                                                                              th_gap,
+                                                                              speed))
 
             with open(self.csv_name, 'a') as f:
-                f.write("{},{},{},{},{}\n".format(t, best, mean, worst, variance, mean_ar, std_ar))
+                f.write("{},{},{},{},{},{},{},{}\n".format(t, best, mean, worst, variance, mean_ar, std_ar, speed))
 
             iteration += 1
             if iteration == 200:
@@ -316,26 +319,26 @@ if __name__ == '__main__':
     epsilon = 0.1
 
     rb_dim = 5
-    #rb_bfopt = "deep_cartpole"
-    rb_bfopt = "gaussian_sum"
+    rb_bfopt = "deep_cartpole"
+    #rb_bfopt = "gaussian_sum"
 
-    lspi_bfdim = 10
-    #lspi_bfopt = "deep_cartpole"
-    lspi_bfopt = "gaussian_sum"
+    lspi_bfdim = 5
+    lspi_bfopt = "deep_cartpole"
+    #lspi_bfopt = "gaussian_sum"
 
-    episode_for_train = 100
+    num_traj_for_policy = 100
     num_expert = 100
-    num_new_traj = 100
+    num_traj_for_mu = 1
 
     reward_basis = RewardBasis(state_dim, rb_dim, gamma, feature_means, bfopt=rb_bfopt)
 
     iteration_names = ["DEBUG"]
-    for it in iteration_names:
-        irl = IRL_LSTDMU(env, reward_basis, gamma, epsilon,
+    for debug_name in iteration_names:
+        irl = IRL_LSTDMU(env, reward_basis, gamma, epsilon, debug_name,
                          lspi_bfdim=lspi_bfdim,
                          lspi_bfopt=lspi_bfopt,
-                         episode_for_train=episode_for_train,
+                         num_traj_for_policy=num_traj_for_policy,
                          num_expert=num_expert,
-                         num_new_traj=num_new_traj,
+                         num_traj_for_mu=num_traj_for_mu,
                          num_eval=100)
-        irl.loop(it)
+        irl.loop()

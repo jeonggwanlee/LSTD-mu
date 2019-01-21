@@ -101,7 +101,7 @@ def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_f
     print("Experiement title : {}".format(experiment_title))
     episode_list_str = list(map(str, episode_list))
     episodes_str = ','.join(episode_list_str)
-    csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}_CenterOpt{}_third.csv'.format(basis_opt,
+    csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}_CenterOpt{}_1010.csv'.format(basis_opt,
                                                                              basis_function_dim,
                                                                              episodes_str,
                                                                              center_opt)
@@ -161,4 +161,6 @@ if __name__ == '__main__':
     #_main(episode_list, game_title="CartPole", basis_opt="gaussian_sum", basis_function_dim=20, saved_basis_use=True, center_opt="random")
     #_main(episode_list, game_title="CartPole", basis_opt="mixture_gaussian_square", basis_function_dim=13, saved_basis_use=False, center_opt="random")
     #_main(episode_list, game_title="CartPole", basis_opt="square", basis_function_dim=5, saved_basis_use=False, center_opt="random")
-    _main(episode_list, game_title="CartPole", basis_opt="deep_cartpole", basis_function_dim=30, saved_basis_use=False, center_opt="random")
+    #_main(episode_list, game_title="CartPole", basis_opt="deep_cartpole", basis_function_dim=30, saved_basis_use=False, center_opt="random")
+    #_main(episode_list, game_title="CartPole", basis_opt="dan_h1", basis_function_dim=30, saved_basis_use=False, center_opt="random")
+    _main(episode_list, game_title="CartPole", basis_opt="dan_pred", basis_function_dim=10, saved_basis_use=False, center_opt="random")

@@ -1,6 +1,7 @@
 import numpy as np
 import ipdb
 from deep_cartpole import DeepCartPole
+from deep_action_network import DeepActionNetwork
 
 class Basis_Function:
     """
@@ -12,32 +13,25 @@ class Basis_Function:
         self.gamma = gamma
         self.num_actions = num_actions
         self.opt = opt
-        assert self.opt in ["gaussian", "gaussian_sum", "sigmoid", "sigmoid_sum", "mixture_gaussian_square", "square", "deep_cartpole"]
+        assert self.opt in ["gaussian", "gaussian_sum", "sigmoid", "sigmoid_sum", "deep_cartpole", "dan_pred", "dan_h1", "dan_h2"]
         assert center_opt in ["random", "fix"]
 
-        self.feature_means2 = None
         self.dcp = None
+        self.dan = None
 
-        if self.opt == "mixture_gaussian_square":
-            assert self.num_features == 13
-            self.num_feature_means = 4
-            self.feature_means = [np.random.uniform(-1, 1, input_dim) for _ in range(self.num_feature_means)]
-            self.feature_means2 = [np.random.uniform(-1, 1, input_dim) for _ in range(self.num_feature_means)]
-
-        elif self.opt == "square":
-            assert self.num_features == 5
-            self.num_feature_means = 4
-            self.feature_means = [np.random.uniform(-1, 1, input_dim) for _ in range(self.num_feature_means)]
-
-        elif self.opt == "deep_cartpole":
-            #assert self.num_features == 4
+        if self.opt == "deep_cartpole":
             self.dcp = DeepCartPole()
-            # fake
-            #self.num_feature_means = 3
             self.dcp_output_dim = 3
             self.num_feature_means = self.num_features - 1
             self.feature_means = [np.random.uniform(-1, 1, self.dcp_output_dim) for _ in range(self.num_feature_means)]
-
+        elif self.opt[:3] == "dan":
+            feature_op = self.opt[4:]
+            self.dan = DeepActionNetwork(feature_op, 4, 2, 10, 10)
+            if not self.dan.isRestore():
+                self.dan.learn()
+            feature_dim = self.dan.get_feature_dim()
+            self.num_feature_means = self.num_features - 1
+            self.feature_means = [np.random.uniform(-1, 1, feature_dim) for _ in range(self.num_feature_means)]
         else:
             self.num_feature_means = self.num_features - 1  # for default value 1
 
@@ -65,11 +59,7 @@ class Basis_Function:
             return self.num_features * self.num_actions
         elif self.opt == "gaussian" or self.opt == "sigmoid":
             return self.num_features * self.input_dim * self.num_actions
-        elif self.opt == "mixture_gaussian_square":
-            return self.num_features * self.num_actions
-        elif self.opt == "square":
-            return self.num_features * self.num_actions
-        elif self.opt == "deep_cartpole":
+        else:
             return self.num_features * self.num_actions
 
     def __calc_basis_component_by_gaussian_sum(self, state, mean, gamma):
@@ -160,27 +150,7 @@ class Basis_Function:
             phi[offset] = 1.
             phi[offset + 1: offset + 1 + len(rbf)] = rbf
 
-        elif self.opt == "mixture_gaussian_square":
-            k = self._num_basis()
-            phi = np.zeros((k,))
-            offset = self.num_features * action
-            rbf = [self.__calc_basis_component_by_gaussian_sum(state, mean, self.gamma) for mean in self.feature_means]
-            rbf2 = [self.__calc_basis_component_by_sigmoid_sum(state, mean) for mean in self.feature_means2]
-            phi[offset] = 1.
-            phi[offset + 1: offset + 1 + len(rbf)] = rbf
-            #phi[offset + 1 + len(rbf): offset + 1 + len(rbf) + 4] = state
-            phi[offset + 1 + len(rbf) + 4: offset + 1 + len(rbf) + 4 + 4] = rbf2
-            phi[offset + 1 + len(rbf): offset + 1 + len(rbf) + 4] = np.array([0,0,0,0])
-            #phi[offset + 1 + len(rbf) + 4: offset + 1 + len(rbf) + 4 + 4] = np.array([0,0,0,0])
  
-        elif self.opt == "square":
-            k = self._num_basis()
-            phi = np.zeros((k,))
-
-            offset = self.num_features * action
-            phi[offset] = 1.
-            phi[offset + 1: offset + 1 + 4] = state**2
-
         elif self.opt == "deep_cartpole":
             k = self._num_basis()
             phi = np.zeros((k,))
@@ -192,6 +162,18 @@ class Basis_Function:
             rbf = [self.__calc_basis_component_by_gaussian_sum(dcp_output, mean, self.gamma) for mean in self.feature_means]
             phi[offset] = 1.
             phi[offset+1: offset + 1 + len(rbf)] = rbf
+
+        elif self.opt[:3] == "dan":
+            k = self._num_basis()
+            phi = np.zeros((k,))
+
+            #q_value = self.dan.get_action_pred(state)
+            q_value = self.dan.get_features(state)
+
+            offset = self.num_features * action
+            rbf = [self.__calc_basis_component_by_gaussian_sum(q_value, mean, self.gamma) for mean in self.feature_means]
+            phi[offset] = 1.
+            phi[offset+1: offset+1+len(rbf)] = rbf
 
         return phi
 

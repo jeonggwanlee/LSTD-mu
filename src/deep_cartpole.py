@@ -13,8 +13,9 @@ class DeepCartPole:
         self.sess = tf.Session()
         self.env = gym.make("CartPole-v0")
         if self.isRestore():
+            #ipdb.set_trace()
             self.saver = tf.train.import_meta_graph('deep_cartpole_save.meta')
-            self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
+            self.saver.restore(self.sess, './deep_cartpole_save')
             self._load_network()
         else:
             self._build_network()

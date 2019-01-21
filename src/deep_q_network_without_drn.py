@@ -13,10 +13,8 @@ import tf_utils
 # TRANSITION = 15000
 # EPISODE = 20
 # MEMORY_SIZE = TRANSITION + 1000
-NUM_ACTION_ITER = 1000
-NUM_REWARD_ITER = 1000
 NUM_EVALUATION = 100
-NUM_EPISODES = 300
+NUM_EPISODES = 500
 MAX_STEPS = 300
 EPOCH_SIZE = 100
 BATCH_SIZE = 100
@@ -92,6 +90,10 @@ class DQN:
         self.memory_size += 1
 
     def learn(self, env):
+        self.csv_name = "deep_qn_without_drn_result2.csv"
+        with open(self.csv_name, 'a') as f:
+            f.write("start\n")
+            f.write("time, average_reward, r_std\n")
         for i_epi in range(NUM_EPISODES):
             state = env.reset()
             average_r = []
@@ -99,7 +101,6 @@ class DQN:
                 #env.render()
                 action = self.get_action(state)
                 next_state, _, done, _ = env.step(action)
-
                 q_value = self.qnet.get_q_value(state)[0, action]
                 next_max_q_value = np.max(self.qnet.get_q_value(next_state))
                 reward = q_value - self.gamma * next_max_q_value
@@ -111,10 +112,13 @@ class DQN:
                 average_r.append(reward)
                 # reward = 1
                 if done:
-                    reward = -1 # rnet mean is -0.4
+                    reward = 0 # rnet mean is -0.4
                     self.memory_add(state, action, next_state, reward, done)
                     print("DQN Training Episode {} finished after {} timesteps".format(i_epi, t+1))
                     print("average reward : {}".format(sum(average_r)/t))
+                    std = np.var(average_r) ** (1/2)
+                    with open(self.csv_name, 'a') as f:
+                        f.write("{},{},{},{}\n".format(i_epi, t+1, sum(average_r)/t, std))
                     break
                 self.memory_add(state, action, next_state, reward, done)
                 state = next_state
@@ -148,7 +152,6 @@ class DQN:
                                                    self.action: action_batch})
             # for epoch
         # for i
-        ipdb.set_trace()
 
         while True:
             cur_state = env.reset()
@@ -162,6 +165,8 @@ class DQN:
                 cur_state = next_state
                 if done:
                     print("{} timesteps".format(t+1))
+                    with open(self.csv_name, 'a') as f:
+                        f.write("t,{}\n".format(t+1))
                     break
 
 

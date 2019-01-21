@@ -1,2 +1,2 @@
-model_checkpoint_path: "deep_cartpole_save"
-all_model_checkpoint_paths: "deep_cartpole_save"
+model_checkpoint_path: "dan_cartpole_Nh120_Nh29"
+all_model_checkpoint_paths: "dan_cartpole_Nh120_Nh29"

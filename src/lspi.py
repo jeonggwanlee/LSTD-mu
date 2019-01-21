@@ -44,7 +44,8 @@ class LSPI:
                                                                                         center_opt)
 
         print("basis_function_pickle_name : {}".format(basis_function_pickle_name))
-        if os.path.exists(basis_function_pickle_name):
+#        if os.path.exists(basis_function_pickle_name):
+        if False:
             if saved_basis_use:
                 print("I found same basis function, and your option is \"saved_basis_use\"=True. So, If you want to use saved one, please enter \"y\"")
                 input_str = input()
@@ -69,11 +70,11 @@ class LSPI:
 
         else:
             self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
-            if opt != "deep_cartpole":
-                with open(basis_function_pickle_name, 'wb') as wf:
-                    pickle.dump(self.basis_function, wf)
-            else:
-                print("LSPI loads deep cartpole")
+            #if opt != "deep_cartpole":
+            #    with open(basis_function_pickle_name, 'wb') as wf:
+            #        pickle.dump(self.basis_function, wf)
+            #else:
+            #    print("LSPI loads deep cartpole")
         #self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
 
         self.num_basis = self.basis_function._num_basis()

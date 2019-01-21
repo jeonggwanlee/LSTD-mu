@@ -20,8 +20,8 @@ important_sampling = False
 
 class IRL:
 
-    def __init__(self, env, reward_basis, gamma, epsilon, lspi_bfdim=20, lspi_bfopt="deep_cartpole",
-            episode_for_train=100, num_expert=200, num_new_traj=200, num_eval=100):
+    def __init__(self, env, reward_basis, gamma, epsilon, debug_name, lspi_bfdim=20, lspi_bfopt="deep_cartpole",
+            num_traj_for_policy=100, num_expert=200, num_traj_for_mu=200, num_eval=100):
         self.env = env
         self.reward_basis = reward_basis
         self.gamma = gamma
@@ -39,21 +39,22 @@ class IRL:
                                                             n_trajectories=num_expert)
         self.mu_expert = self.compute_feature_expectation(self.expert_trajectories)
 
-        self.episode_for_train = episode_for_train
-        self.num_new_traj = num_new_traj
+        self.num_traj_for_policy = num_traj_for_policy
+        self.num_traj_for_mu = num_traj_for_mu
         self.num_eval = num_eval
 
         # Bin name definition
         p = self.reward_basis._num_basis()
-        self.csv_name = "CartPole-v0_#Expert{}_#NewTrajPerLSPI{}_RBOpt{}_RBDim{}_TrainEpisode{}_LSPIBFOpt{}_LSPIBFDim{}_#Eval{}.csv".format(
+        self.csv_name = "CartPole-v0_#Expert{}_#TrajMu{}_#TrajPolicy{}_RBOpt{}_RBDim{}_LSPIBFOpt{}_LSPIBFDim{}_#Eval{}_{}.csv".format(
                 num_expert,
-                self.num_new_traj,
+                self.num_traj_for_mu,
+                num_traj_for_policy,
                 self.reward_basis.opt,
                 p,
-                episode_for_train,
                 lspi_bfopt,
                 lspi_bfdim,
-                num_eval)
+                num_eval,
+                debug_name)
         print("#csv name : ", self.csv_name)
         with open(self.csv_name, 'a') as f:
             f.write("t,best,mean,worst,sd,mean_ar,std_ar\n")
@@ -161,7 +162,7 @@ class IRL:
     def agent_train_wrapper(self, memory, theta, isRender=False):
 
         approx_rewards = []
-        for i in range(self.episode_for_train):
+        for i in range(self.num_traj_for_policy):
             state = self.env.reset()
             for j in range(TRANSITION):
                 if isRender:
@@ -194,7 +195,7 @@ class IRL:
         memory.clear_memory()
         return mean, std
 
-    def loop(self, loop_name):
+    def loop(self):
 
         # Initialization & list definition
         iteration = 0
@@ -226,7 +227,7 @@ class IRL:
 
             # 2. Projection method
             new_trajectories = self._generate_new_trajectories(self.agent,
-                                                               n_trajectories=self.num_new_traj)
+                                                               n_trajectories=self.num_traj_for_mu)
             mu = self.compute_feature_expectation(new_trajectories)
             updated_loss = mu - self.mu_bar
             self.mu_bar += updated_loss * updated_loss.dot(self.theta) / np.square(updated_loss).sum()
@@ -246,7 +247,7 @@ class IRL:
             iteration += 1
 
             with open(self.csv_name, 'a') as f:
-                f.write("{},{},{},{},{}\n".format(t, best, mean, worst, variance, mean_ar, std_ar))
+                f.write("{},{},{},{},{},{},{}\n".format(t, best, mean, worst, variance, mean_ar, std_ar))
 
             if iteration == 200:
                 break
@@ -264,26 +265,27 @@ if __name__ == '__main__':
     epsilon = 0.1
 
     rb_dim = 5
-    rb_bfopt = "deep_cartpole"
-    #rb_bfopt = "gaussian_sum"
+    #rb_bfopt = "deep_cartpole"
+    rb_bfopt = "gaussian_sum"
 
     lspi_bfdim = 5
-    lspi_bfopt = "deep_cartpole"
+    #lspi_bfopt = "deep_cartpole"
     #lspi_bfopt = "gaussian_sum"
+    lspi_bfopt = "dan_pred"
 
-    episode_for_train = 100
+    num_traj_for_policy = 100
     num_expert = 100
-    num_new_traj = 100
+    num_traj_for_mu = 100
 
     reward_basis = RewardBasis(state_dim, rb_dim, gamma, feature_means, bfopt=rb_bfopt)
 
     iteration_names = ["DEBUG"]
-    for it in iteration_names:
-        irl = IRL(env, reward_basis, gamma, epsilon,
+    for debug_name in iteration_names:
+        irl = IRL(env, reward_basis, gamma, epsilon, debug_name,
                         lspi_bfdim=lspi_bfdim,
                         lspi_bfopt=lspi_bfopt,
-                        episode_for_train=episode_for_train,
+                        num_traj_for_policy=num_traj_for_policy,
                         num_expert=num_expert,
-                        num_new_traj=num_new_traj,
+                        num_traj_for_mu=num_traj_for_mu,
                         num_eval=100)
-        irl.loop(it)
+        irl.loop()

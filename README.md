@@ -12,3 +12,12 @@ Coding order
 4. IRL_DAN + Deep Reward Network(DRN) for irl instead of Projection method
 
 
+dependencies.
+
+python3
+
+gym
+tensorflow
+
+
+verified list.

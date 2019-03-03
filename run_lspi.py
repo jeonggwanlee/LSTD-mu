@@ -1,7 +1,7 @@
 import gym
 import numpy as np
-import ipdb
 import os
+import ipdb
 
 from replay_memory import Memory
 from lspi import LSPI
@@ -16,7 +16,7 @@ NUM_TESTS_PER_TRIALS = 300
 important_sampling = False
 gamma = 0.99
 
-def cartpole_experiment(basis_opt="gaussian_sum", basis_function_dim=5, saved_basis_use=True, center_opt="random"):
+def cartpole_experiment(basis_opt="gaussian_sum", basis_function_dim=5, saved_basis_use=True):
     print('Hello CartPole world!')
     env = gym.make('CartPole-v0')
 
@@ -25,11 +25,10 @@ def cartpole_experiment(basis_opt="gaussian_sum", basis_function_dim=5, saved_ba
     action_dim = 1
     print("state_dim : %d\naction_dim : %d\nnum_actions : %d" % (state_dim, action_dim, num_actions))
     print("basis_opt : {}, basis_function_dim : {}".format(basis_opt, basis_function_dim))
-    print("center_opt : {}".format(center_opt))
 
     memory = Memory(MEMORY_SIZE, action_dim, state_dim)
 
-    agent = LSPI(num_actions, state_dim, basis_function_dim, gamma=0.99, opt=basis_opt, saved_basis_use=saved_basis_use, center_opt=center_opt)
+    agent = LSPI(num_actions, state_dim, basis_function_dim, gamma=0.99, opt=basis_opt, saved_basis_use=saved_basis_use)
     return agent, env, memory, 'CartPole-v0'
 
 ###########################################################################################
@@ -85,15 +84,14 @@ def do_lspi(env, memory, agent, game_name, csv_error_name, episode):
     return middle, best, worst, std, sum_ti
 
 
-def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_function_dim=5, saved_basis_use=True, center_opt="random"):
+def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_function_dim=5, saved_basis_use=True):
     if basis_function_dim < 2:
         print("basis_function_dim should be larger than 1.")
         exit()
 
     agent, env, memory, game_name = cartpole_experiment(basis_opt=basis_opt,
                                                         basis_function_dim=basis_function_dim,
-                                                        saved_basis_use=saved_basis_use,
-                                                        center_opt=center_opt)
+                                                        saved_basis_use=saved_basis_use)
 
     experiment_title = get_test_record_title_v2(game_name,
                                                 num_tests=NUM_TRIALS,
@@ -101,13 +99,10 @@ def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_f
     print("Experiement title : {}".format(experiment_title))
     episode_list_str = list(map(str, episode_list))
     episodes_str = ','.join(episode_list_str)
-    csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}_CenterOpt{}_1010.csv'.format(basis_opt,
+    csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}_1010.csv'.format(basis_opt,
                                                                              basis_function_dim,
                                                                              episodes_str,
-                                                                             center_opt)
-    #csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}_FixedCenter.csv'.format(basis_opt,
-    #                                                                         basis_function_dim,
-    #                                                                         episodes_str)
+                                                                             )
     # third : fixed basis function
     csv_error_name = csv_name[:-4] + '_error.csv'
     print("csv_name : {}".format(csv_name))
@@ -158,9 +153,10 @@ def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_f
 if __name__ == '__main__':
 
     episode_list = [100]
+    basis_options = ['gaussian', 'dan_h1', 'dan_pred']
     #_main(episode_list, game_title="CartPole", basis_opt="gaussian_sum", basis_function_dim=20, saved_basis_use=True, center_opt="random")
     #_main(episode_list, game_title="CartPole", basis_opt="mixture_gaussian_square", basis_function_dim=13, saved_basis_use=False, center_opt="random")
     #_main(episode_list, game_title="CartPole", basis_opt="square", basis_function_dim=5, saved_basis_use=False, center_opt="random")
     #_main(episode_list, game_title="CartPole", basis_opt="deep_cartpole", basis_function_dim=30, saved_basis_use=False, center_opt="random")
     #_main(episode_list, game_title="CartPole", basis_opt="dan_h1", basis_function_dim=30, saved_basis_use=False, center_opt="random")
-    _main(episode_list, game_title="CartPole", basis_opt="dan_pred", basis_function_dim=10, saved_basis_use=False, center_opt="random")
+    _main(episode_list, game_title="CartPole", basis_opt="dan_pred", basis_function_dim=10, saved_basis_use=False)

@@ -3,6 +3,9 @@
 Coding order
 ------------
 
+(under construction)
+plz follow 'jeonggwanlee/lspi.git' for lspi
+
 1. LSPI[complete]
 
 2. Batch, Off-policy and model-free Apprenticeship Learning (Projection method[Abbeel, Ng. 2004] + LSPI + LSTD-mu)[I named it "IRL_LSTD_MU"][complete]

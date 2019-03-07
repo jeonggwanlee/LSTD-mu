@@ -80,7 +80,7 @@ class DeepActionNetwork:
         self.n_h1 = n_h1
         self.n_h2 = n_h2
         self.scope = scope
-        self.meta_name = "dan_cartpole_Nh1{}_Nh2{}.meta".format(n_h1, n_h2)
+        self.meta_name = "./dan_savefile/dan_cartpole_Nh1{}_Nh2{}.meta".format(n_h1, n_h2)
         print("meta_name : {}".format(self.meta_name))
         if self.isRestore():
             self.saver = tf.train.import_meta_graph(self.meta_name)
@@ -140,8 +140,8 @@ class DeepActionNetwork:
         self.train_op = graph.get_operation_by_name("deep_action/train_op")
 
     def isRestore(self):
-        if False:
-        #if os.path.exists(self.meta_name):
+        #if False:
+        if os.path.exists(self.meta_name):
             return True
         else:
             return False

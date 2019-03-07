@@ -1,9 +1,10 @@
 import numpy as np
-from rbf import Basis_Function
-from policy import Policy
 import pickle
-import ipdb
 import os
+import ipdb
+
+from policy import Policy
+from rbf import Basis_Function
 
 """
 important property of LSPI is that it does not require an an approximate
@@ -28,54 +29,21 @@ class LSPI:
         epsilon : stopping criterion
         policy(pi) : initial policy
     """
-    #def __init__(self, num_actions=3, num_means=2, gamma=0.99):
-    def __init__(self, num_actions=2, state_dim=4, basis_function_dim=5, gamma=0.99, opt="sigmoid", saved_basis_use=True, center_opt="random"):
+    def __init__(self, num_actions=2, state_dim=4, basis_function_dim=5, gamma=0.99, opt="sigmoid"):
         """
         num_actions. Number of actions. Int.
         state_dim. Number of means. Int. (= state_dim)
         gamma. Float.
         """
         # num_features = state_dim + 1  # for convenience
-        basis_function_pickle_name = "LSPI_bf_#State{}_#Features{}_#Action{}_Opt{}_CenterOpt{}.pickle".format(
+        basis_function_pickle_name = "LSPI_bf_#State{}_#Features{}_#Action{}_Opt{}.pickle".format(
                                                                                         state_dim,
                                                                                basis_function_dim,
                                                                                       num_actions,
-                                                                                              opt,
-                                                                                        center_opt)
+                                                                                              opt)
 
         print("basis_function_pickle_name : {}".format(basis_function_pickle_name))
-#        if os.path.exists(basis_function_pickle_name):
-        if False:
-            if saved_basis_use:
-                print("I found same basis function, and your option is \"saved_basis_use\"=True. So, If you want to use saved one, please enter \"y\"")
-                input_str = input()
-                if input_str != "y":
-                    print("you didn't press \"y\"")
-                    exit()
-                print("!!!load same psi basis function")
-                with open(basis_function_pickle_name, 'rb') as rf:
-                    self.basis_function = pickle.load(rf)
-            else:
-                print("I found same psi basis function, If you want to use saved one, please \"saved_basis_use\"=True")
-                print("Do you want to re-create it?(CAUTION)")
-                input_str = input()
-                if input_str == "y":
-                    self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt, center_opt)
-
-                    if opt != "deep_cartpole":
-                        with open(basis_function_pickle_name, 'wb') as wf:
-                            pickle.dump(self.basis_function, wf)
-                else:
-                    exit()
-
-        else:
-            self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
-            #if opt != "deep_cartpole":
-            #    with open(basis_function_pickle_name, 'wb') as wf:
-            #        pickle.dump(self.basis_function, wf)
-            #else:
-            #    print("LSPI loads deep cartpole")
-        #self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
+        self.basis_function = Basis_Function(state_dim, basis_function_dim, num_actions, gamma, opt)
 
         self.num_basis = self.basis_function._num_basis()
         self.actions = list(range(num_actions))

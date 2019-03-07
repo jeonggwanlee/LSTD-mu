@@ -16,19 +16,22 @@ NUM_TESTS_PER_TRIALS = 300
 important_sampling = False
 gamma = 0.99
 
-def cartpole_experiment(basis_opt="gaussian_sum", basis_function_dim=5, saved_basis_use=True):
+def cartpole_experiment(basis_opt="gaussian", basis_function_dim=5):
     print('Hello CartPole world!')
     env = gym.make('CartPole-v0')
 
     num_actions = env.action_space.n
     state_dim = env.observation_space.shape[0]
     action_dim = 1
-    print("state_dim : %d\naction_dim : %d\nnum_actions : %d" % (state_dim, action_dim, num_actions))
-    print("basis_opt : {}, basis_function_dim : {}".format(basis_opt, basis_function_dim))
+    print("state_dim : ", state_dim)
+    print("action_dim : ", action_dim)
+    print("num_actions : ", num_actions)
+    print("basis_function_option : ", basis_opt)
+    print("basis_function_dim : ", basis_function_dim)
 
     memory = Memory(MEMORY_SIZE, action_dim, state_dim)
 
-    agent = LSPI(num_actions, state_dim, basis_function_dim, gamma=0.99, opt=basis_opt, saved_basis_use=saved_basis_use)
+    agent = LSPI(num_actions, state_dim, basis_function_dim, gamma=0.99, opt=basis_opt)
     return agent, env, memory, 'CartPole-v0'
 
 ###########################################################################################
@@ -76,7 +79,6 @@ def _random_sample(env, memory, agent, csv_error_name, episode, isRender=False):
 
 
 def do_lspi(env, memory, agent, game_name, csv_error_name, episode):
-
     # Training
     middle, best, worst, variance, middle_ti, average_ti, sum_ti = _random_sample(env, memory, agent, csv_error_name, episode, isRender=False)
     std = pow(variance, 1/2)
@@ -84,25 +86,24 @@ def do_lspi(env, memory, agent, game_name, csv_error_name, episode):
     return middle, best, worst, std, sum_ti
 
 
-def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_function_dim=5, saved_basis_use=True):
+def _main(game_title='CartPole', num_episode=100, basis_opt="gaussian", basis_function_dim=5):
     if basis_function_dim < 2:
         print("basis_function_dim should be larger than 1.")
         exit()
 
     agent, env, memory, game_name = cartpole_experiment(basis_opt=basis_opt,
                                                         basis_function_dim=basis_function_dim,
-                                                        saved_basis_use=saved_basis_use)
+                                                        )
 
     experiment_title = get_test_record_title_v2(game_name,
                                                 num_tests=NUM_TRIALS,
                                                 important_sampling=important_sampling)
     print("Experiement title : {}".format(experiment_title))
-    episode_list_str = list(map(str, episode_list))
-    episodes_str = ','.join(episode_list_str)
-    csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}_1010.csv'.format(basis_opt,
-                                                                             basis_function_dim,
-                                                                             episodes_str,
-                                                                             )
+    episodes_str = num_episode
+    csv_name = experiment_title + 'BasisOpt{}_BasisFunctionDim{}_Episode{}.csv'.format(basis_opt,
+                                                                            basis_function_dim,
+                                                                            episodes_str,
+                                                                            )
     # third : fixed basis function
     csv_error_name = csv_name[:-4] + '_error.csv'
     print("csv_name : {}".format(csv_name))
@@ -116,47 +117,42 @@ def _main(episode_list, game_title='CartPole', basis_opt="gaussian_sum", basis_f
         else:
             raise ValueError('you should manually control it!')
 
-    for episode in episode_list:
-        print("episode {}".format(episode))
-        middle_list = []
-        best_list = []
-        worst_list = []
-        std_list = []
-        sum_ti_list = []
-        for i in range(NUM_TRIALS):
-            if i % 10 == 0 and i != 0:
-                print("trials ", i, "/", NUM_TRIALS)
-                print("mid_avg : {} best_avg : {} worst_avg : {}".format(
-                                                                sum(middle_list) / i,
-                                                                sum(best_list) / i,
-                                                                sum(worst_list) / i))
-            #print("episode {}\n".format(episode))
-            agent.initialize_policy()
-            memory.clear_memory()
-            middle, best, worst, std, sum_ti = do_lspi(env, memory, agent, game_name, csv_error_name, episode)
-            middle_list.append(middle)
-            best_list.append(best)
-            worst_list.append(worst)
-            std_list.append(std)
-            sum_ti_list.append(sum_ti)
+    print("episode {}".format(num_episode))
+    middle_list = []
+    best_list = []
+    worst_list = []
+    std_list = []
+    sum_ti_list = []
+    for i in range(NUM_TRIALS):
+        if i % 10 == 0 and i != 0:
+            print("trials ", i, "/", NUM_TRIALS)
+            print("mid_avg : {} best_avg : {} worst_avg : {}".format(
+                                                            sum(middle_list) / i,
+                                                            sum(best_list) / i,
+                                                            sum(worst_list) / i))
+        agent.initialize_policy()
+        memory.clear_memory()
+        middle, best, worst, std, sum_ti = do_lspi(env, memory, agent, game_name, csv_error_name, num_episode)
+        middle_list.append(middle)
+        best_list.append(best)
+        worst_list.append(worst)
+        std_list.append(std)
+        sum_ti_list.append(sum_ti)
 
-        middle_avg = sum(middle_list) / NUM_TRIALS
-        best_avg = sum(best_list) / NUM_TRIALS
-        worst_avg = sum(worst_list) / NUM_TRIALS
-        std_avg = sum(std_list) / NUM_TRIALS
-        sum_ti_avg = sum(sum_ti_list) / NUM_TRIALS
+    middle_avg = sum(middle_list) / NUM_TRIALS
+    best_avg = sum(best_list) / NUM_TRIALS
+    worst_avg = sum(worst_list) / NUM_TRIALS
+    std_avg = sum(std_list) / NUM_TRIALS
+    sum_ti_avg = sum(sum_ti_list) / NUM_TRIALS
 
-        with open(csv_name, 'a') as f:
-            f.write("{},{},{},{},{}\n".format(best_avg, middle_avg, worst_avg, std_avg, sum_ti_avg))
+    with open(csv_name, 'a') as f:
+        f.write("{},{},{},{},{}\n".format(best_avg, middle_avg, worst_avg, std_avg, sum_ti_avg))
 
 
 if __name__ == '__main__':
 
-    episode_list = [100]
-    basis_options = ['gaussian', 'dan_h1', 'dan_pred']
-    #_main(episode_list, game_title="CartPole", basis_opt="gaussian_sum", basis_function_dim=20, saved_basis_use=True, center_opt="random")
-    #_main(episode_list, game_title="CartPole", basis_opt="mixture_gaussian_square", basis_function_dim=13, saved_basis_use=False, center_opt="random")
-    #_main(episode_list, game_title="CartPole", basis_opt="square", basis_function_dim=5, saved_basis_use=False, center_opt="random")
-    #_main(episode_list, game_title="CartPole", basis_opt="deep_cartpole", basis_function_dim=30, saved_basis_use=False, center_opt="random")
-    #_main(episode_list, game_title="CartPole", basis_opt="dan_h1", basis_function_dim=30, saved_basis_use=False, center_opt="random")
-    _main(episode_list, game_title="CartPole", basis_opt="dan_pred", basis_function_dim=10, saved_basis_use=False)
+    basis_options = ['gaussian', 'deep_cartpole', 'dan_h1', 'dan_pred']
+    basis_opt = basis_options[3]
+    basis_function_dims = [5, 10, 20]
+    bf_dim = basis_function_dims[1]
+    _main(game_title="CartPole", num_episode=100, basis_opt=basis_opt, basis_function_dim=bf_dim)

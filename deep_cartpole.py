@@ -14,8 +14,8 @@ class DeepCartPole:
         self.env = gym.make("CartPole-v0")
         if self.isRestore():
             #ipdb.set_trace()
-            self.saver = tf.train.import_meta_graph('deep_cartpole_save.meta')
-            self.saver.restore(self.sess, './deep_cartpole_save')
+            self.saver = tf.train.import_meta_graph('dcp_savefile/deep_cartpole_save.meta')
+            self.saver.restore(self.sess, './dcp_savefile/deep_cartpole_save')
             self._load_network()
         else:
             self._build_network()
@@ -94,7 +94,7 @@ class DeepCartPole:
         self.accuracy = graph.get_tensor_by_name("accuracy:0")
 
     def isRestore(self):
-        if os.path.exists('./deep_cartpole_save.meta'):
+        if os.path.exists('./dcp_savefile/deep_cartpole_save.meta'):
             return True
         else:
             return False
@@ -102,21 +102,19 @@ class DeepCartPole:
     
     def _train(self):
 
-        if os.path.exists('./deep_cartpole_save.meta'):
-            self.saver = tf.train.import_meta_graph('deep_cartpole_save.meta')
+        if os.path.exists('./dcp_savefile/deep_cartpole_save.meta'):
+            self.saver = tf.train.import_meta_graph('dcp_savefile/deep_cartpole_save.meta')
             self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
             self._load_network()
 
         else:
-
             self.sess.run(tf.global_variables_initializer())
             batch_size = 100
             batch_end = self.X.shape[0]
             batch_iter = batch_end  # for first shuffle
-            for step in range(10000):
+            for step in range(30000):
 
                 if batch_iter + batch_size > batch_end:
-                    #print("Shuffling")
                     index_list = list(range(self.X.shape[0]))
                     np.random.shuffle(index_list)
                     self.X = self.X[index_list]
@@ -153,7 +151,7 @@ class DeepCartPole:
                                             feed_dict={self.input: self.X, self.label: self.Y_one_hot}))
 
             self.saver = tf.train.Saver()
-            self.saver.save(self.sess, "./deep_cartpole_save")
+            self.saver.save(self.sess, "./dcp_savefile/deep_cartpole_save")
             self.restore = True
 
     def test(self):

@@ -9,7 +9,6 @@ import os
 from reward_basis import RewardBasis
 from replay_memory import Memory
 from lspi import LSPI
-# from deep_action_network import DeepActionNetwork
 from irl_test import IRL_test
 
 TRANSITION = 15000
@@ -257,10 +256,10 @@ class IRL:
 
 if __name__ == '__main__':
 
+    env = gym.make("CartPole-v0")
     state_dim = 4
     feature_means = None
 
-    env = gym.make("CartPole-v0")
     gamma = 0.99
     epsilon = 0.1
 

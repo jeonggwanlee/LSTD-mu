@@ -17,6 +17,10 @@
 - gym (openai gym)
 - Numpy
 
+## Run
+\`python3 bomap\_{}\_main.py\`
+
+\`python3 bomap_main.py\` (default)
 
 ## Detail
 Deep Action Network(DAN) for deep basis function features instead of simple basis function

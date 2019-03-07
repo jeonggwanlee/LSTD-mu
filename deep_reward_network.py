@@ -1,15 +1,14 @@
 """ Jeonggwan Lee(leejk526@kaist.ac.kr)
 """
 import pickle
-import ipdb
 import gym
 import numpy as np
 import copy
 import os
 import tensorflow as tf
 import random
+import ipdb
 
-from record import get_test_record_title
 import tf_utils
 
 TRANSITION = 15000

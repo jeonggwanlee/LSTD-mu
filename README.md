@@ -18,11 +18,15 @@
 - Numpy
 
 ## Run
-\`python3 bomap\_{}\_main.py\`
 
-\`python3 bomap_main.py\` (default)
+`python3 bomap_main.py` (default)
+
+`python3 bomap\_{}\_main.py` (under construction)
 
 ## Detail
+(under construction)
+
 Deep Action Network(DAN) for deep basis function features instead of simple basis function
-4. IRL_DAN + Deep Reward Network(DRN) for irl instead of Projection method
+
+IRL_DAN + Deep Reward Network(DRN) for irl instead of Projection method
 
